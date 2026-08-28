@@ -5,6 +5,42 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cổng thông báo nội bộ</title>
 <style>
+
+ /* THANH NAV TABS MỚI */
+    .nav-tabs {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 24px;
+    }
+    
+    .nav-tab {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 20px;
+      border-radius: 30px;
+      background: #fff;
+      color: #334155;
+      font-weight: 600;
+      text-decoration: none;
+      border: 1px solid #e5e7eb;
+      transition: .25s;
+    }
+    
+    .nav-tab:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 18px rgba(0,0,0,.12);
+      color: #2563eb;
+    }
+    
+    .nav-tab.active {
+      background: linear-gradient(135deg,#2563eb,#1e40af);
+      color: #fff;
+      border: none;
+    }
+ 
 *{box-sizing:border-box}body{margin:0;font-family:Inter,Arial,sans-serif;background:#f5f7fb;color:#172033}
 .hidden{display:none!important}.login{min-height:100vh;display:grid;place-items:center;padding:20px;background:linear-gradient(135deg,#edf2ff,#f8fafc)}
 .login-card{width:min(430px,100%);background:#fff;padding:34px;border-radius:22px;box-shadow:0 20px 60px #17203318}
@@ -21,6 +57,18 @@ textarea{min-height:190px;resize:vertical}.btn{border:1px solid #d7deea;backgrou
 </head>
 <body>
 
+<!-- THANH TAB TRUY CẬP CÁC TRANG -->
+    <div class="nav-tabs">
+        <a href="#" class="nav-tab active">📢 Thông báo</a>
+        <a href="https://bangchamcong.pages.dev" target="_blank" class="nav-tab">📋 Chấm Công</a>
+        <a href="https://phepnam.pages.dev" target="_blank" class="nav-tab">📅 Phép Năm</a>
+        <a href="https://thongbao-lww.pages.dev" target="_blank" class="nav-tab">📜 Lỗi cơm</a>
+        <a href="https://phucap.pages.dev" target="_blank" class="nav-tab">🥛 Phụ cấp sữa</a>
+        <a href="https://noikhambenh.pages.dev" target="_blank" class="nav-tab">🏥 BHXH</a>
+        <a href="https://antoan.pages.dev" target="_blank" class="nav-tab">🛡️ An Toàn</a>
+        <a href="https://xnc-immigration.pages.dev" target="_blank" class="nav-tab">🛂 Immigration</a>
+    </div> 
+ 
 <section id="login" class="login">
  <div class="login-card">
   <div class="brand">🏭 Công ty CP Liwayway Việt Nam</div>
