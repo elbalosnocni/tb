@@ -50,7 +50,7 @@ function doGet(e) {
   return json_({
     ok: true,
     service: CONFIG.appName,
-    version: '2.0',
+    version: '2.1',
     time: Utilities.formatDate(new Date(), CONFIG.timezone, "yyyy-MM-dd'T'HH:mm:ss"),
     message: 'API is running. Use POST for commands.'
   });
@@ -73,6 +73,7 @@ function route_(action, b) {
     case 'logout': return apiLogout_(b);
     case 'me': return apiMe_(b);
     case 'dashboard': return apiDashboard_(b);
+    case 'important': return apiImportant_(b);
     case 'announcement': return apiAnnouncement_(b);
     case 'markRead': return apiMarkRead_(b);
     case 'readStats': return apiReadStats_(b);
@@ -214,6 +215,14 @@ function apiDashboard_(b) {
     departments:departments_(),
     months:months_(all)
   };
+}
+
+function apiImportant_(b) {
+  const s=session_(b.token);
+  const all=visibleAnnouncements_(s.employeeId);
+  const unread=unreadIds_(s.employeeId,all.map(a=>a.ID));
+  const important=all.filter(a=>a.Pinned===true || ['HIGH','URGENT'].includes(String(a.Priority||'').toUpperCase()) || String(a.Type||'').includes('Khẩn cấp'));
+  return {ok:true,user:s,announcements:important.map(a=>publicAnnouncement_(a,unread.has(a.ID))),unreadCount:unread.size};
 }
 
 function apiAnnouncement_(b) {
@@ -713,9 +722,11 @@ function json_(o) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 function parseBody_(e) {
-  if(!e || !e.postData || !e.postData.contents) return {};
-  const raw=e.postData.contents;
-  try{return JSON.parse(raw)}catch(err){}
-  const p=e.parameter||{};
-  return p;
+  if(!e) return {};
+  const raw=e.postData && e.postData.contents ? e.postData.contents : '';
+  if(raw){
+    try{return JSON.parse(raw)}catch(err){}
+    try{return JSON.parse(decodeURIComponent(raw))}catch(err2){}
+  }
+  return e.parameter||{};
 }

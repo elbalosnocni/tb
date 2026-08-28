@@ -194,3 +194,12 @@ Bản v2 đã bỏ `google.script.run` khỏi frontend. Tuy nhiên nếu triển
 - upload resumable/chunk nếu file lớn
 - Google Workspace SSO/OIDC nếu công ty cần bảo mật cao
 - CSP/security headers ở frontend hosting
+
+
+## v2.1
+- Không lưu token đăng nhập giữa các lần mở/reload trang.
+- Loading overlay khi đăng nhập, import, lưu thông báo.
+- Tab Quan trọng dùng API riêng.
+- Mỗi thông báo có “Bấm vào xem chi tiết →”.
+- API báo rõ khi GAS trả HTML thay vì JSON.
+- Khi sửa deployment, tạo **New version** và dùng URL `/exec`, không dùng `/dev`.
