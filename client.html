@@ -1,0 +1,250 @@
+let TOKEN = localStorage.getItem('notice_token') || '';
+let ME = null;
+let DASH = null;
+let currentFilters = {};
+
+document.addEventListener('DOMContentLoaded', init);
+
+function init(){
+  google.script.run.withSuccessHandler(c=>document.title=c.appName).getPublicConfig();
+  if(TOKEN){
+    google.script.run.withSuccessHandler(r=>{
+      if(r && r.ok){ ME=r.user; enterApp(); } else showLogin();
+    }).withFailureHandler(showLogin).me(TOKEN);
+  } else showLogin();
+}
+
+function showLogin(){
+  document.getElementById('loginView').classList.remove('hidden');
+  document.getElementById('mainView').classList.add('hidden');
+}
+function enterApp(){
+  document.getElementById('loginView').classList.add('hidden');
+  document.getElementById('mainView').classList.remove('hidden');
+  document.getElementById('hello').textContent=`Xin chào ${ME.fullName}`;
+  if(ME.role==='ADMIN'||ME.role==='HR') document.getElementById('adminNav').classList.remove('hidden');
+  loadDashboard();
+}
+function doLogin(){
+  const id=document.getElementById('loginId').value;
+  const pw=document.getElementById('loginPassword').value;
+  document.getElementById('loginError').textContent='';
+  google.script.run.withSuccessHandler(r=>{
+    if(!r.ok){document.getElementById('loginError').textContent=r.message;return;}
+    TOKEN=r.token; localStorage.setItem('notice_token',TOKEN); ME=r.user; enterApp();
+  }).withFailureHandler(e=>document.getElementById('loginError').textContent=e.message).login(id,pw);
+}
+function doLogout(){
+  google.script.run.logout(TOKEN);
+  TOKEN='';localStorage.removeItem('notice_token');ME=null;showLogin();
+}
+function call(fn,...args){
+  return new Promise((resolve,reject)=>{
+    google.script.run.withSuccessHandler(resolve).withFailureHandler(e=>{
+      toast(e.message||String(e),'error');reject(e);
+    })[fn](TOKEN,...args);
+  });
+}
+async function loadDashboard(filters={}){
+  currentFilters=filters;
+  try{
+    DASH=await call('getDashboard',filters);
+    renderHome();
+    renderNotices();
+  }catch(e){}
+}
+function showPage(page){
+  ['home','notices','profile','admin'].forEach(p=>document.getElementById(p+'Page').classList.add('hidden'));
+  document.getElementById(page+'Page').classList.remove('hidden');
+  document.querySelectorAll('.navbtn').forEach(b=>b.classList.remove('active'));
+  if(page==='home') document.querySelector('.navbtn').classList.add('active');
+  if(page==='notices') document.querySelectorAll('.navbtn')[1].classList.add('active');
+  if(page==='profile') renderProfile();
+  if(page==='admin') renderAdmin();
+}
+function renderHome(){
+  const unread=DASH.unreadCount;
+  const recent=DASH.announcements.slice(0,6);
+  document.getElementById('homePage').innerHTML=`
+    <div class="hero"><div><h2>Xin chào ${esc(ME.fullName)} 👋</h2>
+    <div class="muted">Thông tin mới nhất dành cho ${esc(ME.department||'bạn')}</div></div>
+    <div class="stat"><span>🔴 Chưa đọc</span><b>${unread}</b></div></div>
+    <div class="cards">${recent.map(cardHtml).join('')||'<div class="card">Không có thông báo.</div>'}</div>`;
+}
+function renderNotices(){
+  const months=Object.keys(DASH.countsByMonth).sort((a,b)=>monthKey(b)-monthKey(a));
+  document.getElementById('noticesPage').innerHTML=`
+    <div class="hero"><div><h2>📢 Thông báo</h2><div class="muted">Thông báo mới nhất luôn ở trên.</div></div></div>
+    <div class="filters">
+      <input id="fSearch" placeholder="🔎 Tìm tiêu đề, nội dung, phòng ban, từ khóa, mã thông báo..." value="${esc(currentFilters.search||'')}">
+      <select id="fMonth"><option value="">📅 Tất cả tháng</option>${months.map(m=>`<option ${currentFilters.month===m?'selected':''}>${m}</option>`).join('')}</select>
+      <select id="fType"><option value="">🏷️ Tất cả loại</option>${DASH.types.map(t=>`<option ${currentFilters.type===t?'selected':''}>${esc(t)}</option>`).join('')}</select>
+      <select id="fDept"><option value="">📍 Tất cả bộ phận</option>${DASH.departments.map(t=>`<option ${currentFilters.department===t?'selected':''}>${esc(t)}</option>`).join('')}</select>
+      <button class="primary" onclick="applyFilters()">Lọc</button>
+    </div>
+    <label style="display:block;margin-bottom:15px"><input type="checkbox" id="fUnread" ${currentFilters.unreadOnly?'checked':''}> 🔴 Chưa đọc</label>
+    <div class="cards">${DASH.announcements.map(cardHtml).join('')||'<div class="card">Không tìm thấy thông báo phù hợp.</div>'}</div>`;
+}
+function applyFilters(){
+  loadDashboard({
+    search:document.getElementById('fSearch').value,
+    month:document.getElementById('fMonth').value,
+    type:document.getElementById('fType').value,
+    department:document.getElementById('fDept').value,
+    unreadOnly:document.getElementById('fUnread').checked
+  });
+}
+function filterUnread(){showPage('notices');loadDashboard({...currentFilters,unreadOnly:true});}
+function monthKey(s){const [m,y]=s.split('/');return Number(y)*100+Number(m)}
+function cardHtml(a){
+  return `<div class="card ${a.unread?'unread':''}" onclick="openNotice('${escAttr(a.id)}')">
+    <div class="card-head"><span class="badge">${esc(a.type)}</span><span class="pin">${a.pinned?'📌':''}</span></div>
+    <div class="title">${esc(a.title)}</div>
+    <div class="meta">${formatDate(a.publishDate)} · ${esc(a.author||'')}</div>
+    <div style="margin-top:10px">${esc(stripHtml(a.content).slice(0,220))}${a.content.length>220?'…':''}</div>
+    <div style="margin-top:10px">${a.unread?'<span class="badge danger">🔴 Chưa đọc</span>':'<span class="badge">✓ Đã đọc</span>'}</div>
+  </div>`;
+}
+async function openNotice(id){
+  try{
+    const r=await call('getAnnouncement',id);
+    const a=r.announcement, att=r.attachment;
+    document.getElementById('modal').classList.remove('hidden');
+    document.getElementById('modal').innerHTML=`<div class="modal-box"><div class="modal-head"><h2>${esc(a.title)}</h2><button class="close" onclick="closeModal()">×</button></div>
+      <div class="meta">${formatDate(a.publishDate)} · ${esc(a.type)} · ${esc(a.author||'')}</div>
+      <hr><div class="content">${safeHtml(a.content)}</div>
+      ${att?attachmentHtml(att):''}
+      <div style="margin-top:20px"><span class="badge">✓ Đã đọc</span></div></div>`;
+    await loadDashboard(currentFilters);
+  }catch(e){}
+}
+function attachmentHtml(a){
+  const url=a.previewUrl||a.url||'';
+  if(!url) return '';
+  const lower=(a.name||'').toLowerCase();
+  const previewable=/\.(pdf|png|jpg|jpeg|gif|webp|mp4|doc|docx|xls|xlsx|ppt|pptx)$/i.test(lower);
+  return `<div class="attachment"><b>📎 ${esc(a.name||'Tệp đính kèm')}</b><p><a href="${escAttr(url)}" target="_blank">Mở tệp</a></p>${previewable?`<iframe src="${escAttr(a.previewUrl||url)}"></iframe>`:''}</div>`;
+}
+function closeModal(){document.getElementById('modal').classList.add('hidden')}
+function renderProfile(){
+  document.getElementById('profilePage').innerHTML=`<div class="detail"><h2>👤 Cá nhân</h2>
+  <p><b>Mã nhân viên:</b> ${esc(ME.employeeId)}</p><p><b>Họ tên:</b> ${esc(ME.fullName)}</p><p><b>Bộ phận:</b> ${esc(ME.department||'')}</p><button class="primary" onclick="showPasswordModal()">Đổi mật khẩu</button></div>`;
+}
+function showPasswordModal(){
+  document.getElementById('modal').classList.remove('hidden');
+  document.getElementById('modal').innerHTML=`<div class="modal-box"><div class="modal-head"><h2>🔑 Đổi mật khẩu</h2><button class="close" onclick="closeModal()">×</button></div>
+  <div class="form"><input id="oldPw" type="password" placeholder="Mật khẩu hiện tại"><input id="newPw" type="password" placeholder="Mật khẩu mới (tối thiểu 8 ký tự)"><input id="newPw2" type="password" placeholder="Nhập lại mật khẩu"><button class="primary" onclick="changePassword()">Lưu</button></div></div>`;
+}
+async function changePassword(){
+  const a=document.getElementById('newPw').value,b=document.getElementById('newPw2').value;
+  if(a!==b){toast('Mật khẩu nhập lại không khớp','error');return}
+  try{await call('changeOwnPassword',document.getElementById('oldPw').value,a);toast('Đã đổi mật khẩu');closeModal()}catch(e){}
+}
+
+/* ADMIN */
+async function renderAdmin(){
+  if(!(ME.role==='ADMIN'||ME.role==='HR')) return;
+  const r=await call('getAdminDashboard');
+  document.getElementById('adminPage').innerHTML=`
+    <div class="admin-head"><h2>⚙️ QUẢN LÝ THÔNG BÁO</h2><div class="actions"><button class="btn" onclick="showImportModal()">📥 Import nhân viên</button><button class="primary" onclick="showAnnouncementForm()">＋ Tạo thông báo mới</button></div></div>
+    <div class="stats"><div class="stat">Nhân viên<b>${r.stats.employees}</b></div><div class="stat">Thông báo<b>${r.stats.announcements}</b></div><div class="stat">Published<b>${r.stats.published}</b></div><div class="stat">Hẹn giờ<b>${r.stats.scheduled}</b></div><div class="stat">Lượt đọc<b>${r.stats.totalReads}</b></div></div>
+    <div style="height:18px"></div>
+    <div class="table-wrap"><table class="table"><thead><tr><th>Ngày</th><th>Tiêu đề</th><th>Loại</th><th>Người đăng</th><th>Trạng thái</th><th>Đối tượng</th><th>Thao tác</th></tr></thead><tbody>
+    ${r.announcements.map(a=>`<tr><td>${formatDate(a.publishDate)}</td><td>${a.pinned?'📌 ':''}${esc(a.title)}</td><td>${esc(a.type)}</td><td>${esc(a.author)}</td><td>${esc(a.status)}</td><td>${esc(a.targetText)}</td><td><div class="actions"><button class="btn" onclick="openNotice('${escAttr(a.id)}')">👁️</button><button class="btn" onclick="editAnnouncement('${escAttr(a.id)}')">✏️</button><button class="btn" onclick="pinAnnouncement('${escAttr(a.id)}')">📌</button><button class="btn" onclick="readStats('${escAttr(a.id)}')">📊</button><button class="btn" onclick="deleteAnnouncement('${escAttr(a.id)}')">🗑️</button></div></td></tr>`).join('')}
+    </tbody></table></div>`;
+}
+async function showAnnouncementForm(id=''){
+  let a=null;
+  if(id) a=DASH?.announcements.find(x=>x.id===id);
+  const types=['📢 Thông báo chung','🕐 Thời gian làm việc','💰 Lương & thưởng','🎁 Phúc lợi','🏥 Sức khỏe','🦺 An toàn / HSE','🏭 Sản xuất','📋 Nhân sự','🎉 Hoạt động công ty','⚠️ Khẩn cấp'];
+  document.getElementById('modal').classList.remove('hidden');
+  document.getElementById('modal').innerHTML=`<div class="modal-box"><div class="modal-head"><h2>${id?'✏️ Sửa':'＋ Tạo'} thông báo</h2><button class="close" onclick="closeModal()">×</button></div>
+  <div class="form"><input id="aId" type="hidden" value="${escAttr(id)}"><label>Tiêu đề</label><input id="aTitle" value="${escAttr(a?.title||'')}"><label>Nội dung</label><textarea id="aContent">${esc(a?.content||'')}</textarea>
+  <div class="grid2"><div><label>Loại</label><select id="aType">${types.map(t=>`<option ${a?.type===t?'selected':''}>${esc(t)}</option>`).join('')}</select></div>
+  <div><label>Ưu tiên</label><select id="aPriority"><option>NORMAL</option><option ${a?.priority==='HIGH'?'selected':''}>HIGH</option><option ${a?.priority==='URGENT'?'selected':''}>URGENT</option></select></div></div>
+  <div class="grid2"><div><label>Ngày đăng</label><input id="aDate" type="datetime-local" value="${localDateInput(a?.publishDate)}"></div><div><label>Hẹn giờ đăng</label><input id="aSchedule" type="datetime-local"></div></div>
+  <label>Từ khóa</label><input id="aKeywords" value="${escAttr(a?.keywords||'')}">
+  <label><input id="aPinned" type="checkbox" ${a?.pinned?'checked':''}> 📌 Ghim thông báo</label>
+  <label>Đối tượng xem</label>
+  <div id="targets"><div class="target-row"><select><option value="ALL">ALL - Tất cả</option><option value="DEPARTMENT">DEPARTMENT - Bộ phận</option><option value="EMPLOYEE">EMPLOYEE - Nhân viên</option><option value="TYPE">TYPE - Chức danh/vai trò</option></select><input placeholder="ALL hoặc giá trị"></div></div>
+  <button class="btn" onclick="addTargetRow()">＋ Thêm điều kiện</button>
+  <div class="drop"><input id="aFile" type="file"><div>Ảnh / Video / Word / Excel / PowerPoint / PDF</div></div>
+  <button class="primary" onclick="saveAnn()">LƯU THÔNG BÁO</button></div></div>`;
+}
+function addTargetRow(){
+  const d=document.createElement('div');d.className='target-row';
+  d.innerHTML=`<select><option value="ALL">ALL - Tất cả</option><option value="DEPARTMENT">DEPARTMENT - Bộ phận</option><option value="EMPLOYEE">EMPLOYEE - Nhân viên</option><option value="TYPE">TYPE - Chức danh/vai trò</option></select><input placeholder="Giá trị"><button class="btn" onclick="this.parentNode.remove()">×</button>`;
+  document.getElementById('targets').appendChild(d);
+}
+async function saveAnn(){
+  const file=document.getElementById('aFile').files[0];
+  let attachment=null;
+  if(file) attachment=await uploadAttachment(file);
+  const targets=[...document.querySelectorAll('#targets .target-row')].map(row=>({type:row.children[0].value,value:row.children[1].value||'ALL'}));
+  const data={id:document.getElementById('aId').value,title:document.getElementById('aTitle').value,content:document.getElementById('aContent').value,type:document.getElementById('aType').value,priority:document.getElementById('aPriority').value,pinned:document.getElementById('aPinned').checked,keywords:document.getElementById('aKeywords').value,publishDate:document.getElementById('aDate').value,scheduledAt:document.getElementById('aSchedule').value,targets,attachmentJson:attachment};
+  try{await call('saveAnnouncement',data);toast('Đã lưu thông báo');closeModal();renderAdmin();}catch(e){}
+}
+async function uploadAttachment(file){
+  if(file.size>25*1024*1024){toast('Tệp tối đa 25MB','error');throw new Error('File too large')}
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=async()=>{try{const b64=reader.result.split(',')[1];const r=await call('uploadAttachment',{name:file.name,mimeType:file.type,base64:b64});resolve(r.attachment)}catch(e){reject(e)}};
+    reader.readAsDataURL(file);
+  });
+}
+async function editAnnouncement(id){
+  const r=await call('getAnnouncement',id); // permission checked; admin can see if target excludes admin only if not target. Safer use admin list in production.
+  const a=r.announcement;
+  DASH=DASH||{announcements:[]};DASH.announcements=[...DASH.announcements.filter(x=>x.id!==id),a];
+  showAnnouncementForm(id);
+}
+async function pinAnnouncement(id){try{await call('togglePinned',id);toast('Đã cập nhật ghim');renderAdmin()}catch(e){}}
+async function deleteAnnouncement(id){if(!confirm('Xóa thông báo này?'))return;try{await call('deleteAnnouncement',id);toast('Đã xóa');renderAdmin()}catch(e){}}
+async function readStats(id){
+  try{const r=await call('getReadStats',id);alert(`THÔNG BÁO: ${r.title}\nĐối tượng: ${r.audience.toLocaleString()}\n✓ Đã đọc: ${r.read.toLocaleString()}\n○ Chưa đọc: ${r.unread.toLocaleString()}\nTỷ lệ đọc: ${r.rate.toFixed(2)}%`)}catch(e){}
+}
+
+/* EXCEL IMPORT */
+function showImportModal(){
+  document.getElementById('modal').classList.remove('hidden');
+  document.getElementById('modal').innerHTML=`<div class="modal-box"><div class="modal-head"><h2>📥 Import nhân viên từ Excel</h2><button class="close" onclick="closeModal()">×</button></div>
+  <p>Khóa chính: EmployeeID. Không xóa nhân viên cũ. Có thể đánh dấu INACTIVE những người không xuất hiện trong file.</p>
+  <div class="drop"><input id="excelFile" type="file" accept=".xlsx,.xls,.csv"></div>
+  <div style="margin-top:15px"><label><input type="radio" name="missing" value="NO_CHANGE" checked> Không thay đổi</label><br><label><input type="radio" name="missing" value="INACTIVE"> Đánh dấu INACTIVE</label></div>
+  <div id="importPreview"></div><div style="margin-top:15px"><button class="primary" onclick="previewExcel()">1. Xem trước</button> <button class="btn hidden" id="commitImportBtn" onclick="commitExcel()">2. Xác nhận Import</button></div></div>`;
+}
+async function loadSheetJS(){
+  if(window.XLSX)return;
+  await new Promise((resolve,reject)=>{const s=document.createElement('script');s.src='https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';s.onload=resolve;s.onerror=reject;document.head.appendChild(s)});
+}
+let IMPORT_ROWS=[],IMPORT_FILE='';
+async function previewExcel(){
+  try{
+    await loadSheetJS();
+    const file=document.getElementById('excelFile').files[0];if(!file){toast('Chọn file Excel','error');return}
+    IMPORT_FILE=file.name;
+    const buf=await file.arrayBuffer();
+    const wb=XLSX.read(buf,{type:'array'});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    IMPORT_ROWS=XLSX.utils.sheet_to_json(ws,{defval:''});
+    const r=await call('previewEmployeeImport',{rows:IMPORT_ROWS});
+    document.getElementById('importPreview').innerHTML=`<div class="progress">Tổng: <b>${r.total}</b> · Thêm: <b>${r.rows.filter(x=>x.action==='ADD').length}</b> · Cập nhật: <b>${r.rows.filter(x=>x.action==='UPDATE').length}</b> · Trùng trong file: <b>${r.duplicates.length}</b></div>
+    <div class="table-wrap"><table class="table"><thead><tr><th>EmployeeID</th><th>Họ tên</th><th>Bộ phận</th><th>Action</th></tr></thead><tbody>${r.rows.slice(0,100).map(x=>`<tr><td>${esc(x.EmployeeID)}</td><td>${esc(x.FullName)}</td><td>${esc(x.Department)}</td><td>${x.action}</td></tr>`).join('')}</tbody></table></div>`;
+    document.getElementById('commitImportBtn').classList.remove('hidden');
+  }catch(e){toast(e.message||String(e),'error')}
+}
+async function commitExcel(){
+  const missing=document.querySelector('input[name="missing"]:checked').value;
+  if(!IMPORT_ROWS.length)return;
+  if(!confirm('Xác nhận ghi dữ liệu vào Google Sheets?'))return;
+  try{const r=await call('commitEmployeeImport',{rows:IMPORT_ROWS,fileName:IMPORT_FILE,missingAction:missing});alert(`Import thành công\\nThêm: ${r.added}\\nCập nhật: ${r.updated}\\nBỏ qua: ${r.skipped}\\nĐánh dấu INACTIVE: ${r.markedInactive}\\nImport ID: ${r.importId}`);closeModal()}catch(e){}
+}
+
+/* UTIL */
+function toast(msg,type='ok'){const t=document.getElementById('toast');t.textContent=msg;t.style.cssText=`position:fixed;right:20px;bottom:20px;z-index:99;padding:12px 16px;background:${type==='error'?'#b42318':'#067647'};color:#fff;border-radius:10px`;setTimeout(()=>t.textContent='',3500)}
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function escAttr(s){return esc(s)}
+function stripHtml(s){return String(s||'').replace(/<[^>]*>/g,' ')}
+function safeHtml(s){return esc(s).replace(/\n/g,'<br>')}
+function formatDate(s){if(!s)return'';const d=new Date(s);return isNaN(d)?String(s):d.toLocaleString('vi-VN',{dateStyle:'short',timeStyle:'short'})}
+function localDateInput(s){if(!s)return'';const d=new Date(s);if(isNaN(d))return'';const p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`}
