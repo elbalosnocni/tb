@@ -1,0 +1,1911 @@
+<script>
+
+const App = {
+
+  state: {
+    token:
+      localStorage.getItem(
+        'company_portal_token'
+      ),
+
+    user: null,
+
+    announcements: [],
+
+    page: 'home',
+
+    filters: {
+      search: '',
+      month: '',
+      type: '',
+      unread: false
+    }
+  },
+
+
+  start() {
+
+    if (this.state.token) {
+
+      this.loadCurrentUser()
+        .then(() =>
+          this.renderApp()
+        )
+        .catch(() => {
+
+          this.logoutLocal();
+
+          this.renderLogin();
+        });
+
+    } else {
+
+      this.renderLogin();
+
+    }
+  },
+
+
+  renderLogin() {
+
+    document
+      .getElementById('app')
+      .innerHTML = `
+
+      <div class="login-page">
+
+        <div class="login-card">
+
+          <div class="logo">🏭</div>
+
+          <div class="login-title">
+            COMPANY
+          </div>
+
+          <div class="login-subtitle">
+            CỔNG THÔNG BÁO NỘI BỘ
+          </div>
+
+          <form
+            id="loginForm"
+          >
+
+            <div class="form-group">
+
+              <label>
+                Mã nhân viên
+              </label>
+
+              <input
+                id="loginEmployeeId"
+                class="input"
+                placeholder="NV000123"
+                autocomplete="username"
+                required
+              >
+
+            </div>
+
+
+            <div class="form-group">
+
+              <label>
+                Mật khẩu
+              </label>
+
+              <input
+                id="loginPassword"
+                type="password"
+                class="input"
+                placeholder="••••••••"
+                autocomplete="current-password"
+                required
+              >
+
+            </div>
+
+
+            <div
+              id="loginError"
+              class="text-danger"
+              style="margin-bottom:12px"
+            ></div>
+
+
+            <button
+              class="btn btn-primary btn-full"
+              type="submit"
+            >
+              ĐĂNG NHẬP
+            </button>
+
+          </form>
+
+        </div>
+
+      </div>
+    `;
+
+
+    document
+      .getElementById('loginForm')
+      .addEventListener(
+        'submit',
+        async e => {
+
+          e.preventDefault();
+
+          const id =
+            document
+              .getElementById(
+                'loginEmployeeId'
+              )
+              .value;
+
+          const password =
+            document
+              .getElementById(
+                'loginPassword'
+              )
+              .value;
+
+          try {
+
+            this.loading(true);
+
+            const result =
+              await API.login(
+                id,
+                password
+              );
+
+            this.state.token =
+              result.token;
+
+            this.state.user =
+              result.user;
+
+            localStorage.setItem(
+              'company_portal_token',
+              result.token
+            );
+
+            this.renderApp();
+
+          } catch (err) {
+
+            document
+              .getElementById(
+                'loginError'
+              )
+              .textContent =
+              err.message;
+
+          } finally {
+
+            this.loading(false);
+
+          }
+        }
+      );
+  },
+
+
+  async loadCurrentUser() {
+
+    const result =
+      await API.currentUser(
+        this.state.token
+      );
+
+    this.state.user = {
+      ...result.employee,
+      role: result.role
+    };
+  },
+
+
+  renderApp() {
+
+    const isAdmin =
+      [
+        'ADMIN',
+        'HR',
+        'HR ADMIN'
+      ].includes(
+        String(
+          this.state.user.role
+        ).toUpperCase()
+      );
+
+
+    document
+      .getElementById('app')
+      .innerHTML = `
+
+      <div class="app">
+
+        <header class="topbar">
+
+          <div class="brand">
+
+            <span class="brand-icon">
+              🏭
+            </span>
+
+            <span class="brand-text">
+              CỔNG THÔNG BÁO NỘI BỘ
+            </span>
+
+          </div>
+
+
+          <div class="user-area">
+
+            <span class="user-name">
+              ${escapeHtml(
+                this.state.user.FullName ||
+                ''
+              )}
+            </span>
+
+            <button
+              class="btn btn-secondary"
+              onclick="App.logout()"
+            >
+              Đăng xuất
+            </button>
+
+          </div>
+
+        </header>
+
+
+        <div class="layout">
+
+          <aside class="sidebar">
+
+            <button
+              class="nav-item active"
+              onclick="App.navigate('home')"
+            >
+              🏠 <span>Trang chủ</span>
+            </button>
+
+            <button
+              class="nav-item"
+              onclick="App.navigate('announcements')"
+            >
+              📢 <span>Thông báo</span>
+            </button>
+
+            <button
+              class="nav-item"
+              onclick="App.navigate('important')"
+            >
+              📌 <span>Quan trọng</span>
+            </button>
+
+            <button
+              class="nav-item"
+              onclick="App.navigate('profile')"
+            >
+              👤 <span>Cá nhân</span>
+            </button>
+
+            ${
+              isAdmin
+              ? `
+                <hr>
+
+                <button
+                  class="nav-item"
+                  onclick="App.navigate('admin')"
+                >
+                  ⚙️ <span>Quản trị</span>
+                </button>
+              `
+              : ''
+            }
+
+          </aside>
+
+
+          <main
+            class="main"
+            id="mainContent"
+          ></main>
+
+        </div>
+
+      </div>
+    `;
+
+    this.renderPage();
+  },
+
+
+  navigate(page) {
+
+    this.state.page =
+      page;
+
+    this.renderPage();
+  },
+
+
+  async renderPage() {
+
+    const main =
+      document.getElementById(
+        'mainContent'
+      );
+
+    if (!main) return;
+
+
+    if (
+      this.state.page
+      === 'home'
+    ) {
+
+      await this.renderHome(main);
+
+    } else if (
+      this.state.page
+      === 'announcements'
+    ) {
+
+      await this.renderAnnouncements(
+        main
+      );
+
+    } else if (
+      this.state.page
+      === 'important'
+    ) {
+
+      await this.renderImportant(
+        main
+      );
+
+    } else if (
+      this.state.page
+      === 'profile'
+    ) {
+
+      this.renderProfile(main);
+
+    } else if (
+      this.state.page
+      === 'admin'
+    ) {
+
+      await this.renderAdmin(
+        main
+      );
+    }
+  },
+
+
+  async renderHome(main) {
+
+    this.loading(true);
+
+    try {
+
+      const data =
+        await API.dashboard(
+          this.state.token
+        );
+
+      main.innerHTML = `
+
+        <h1 class="page-title">
+          Xin chào
+          ${escapeHtml(
+            this.state.user.FullName
+          )}
+          👋
+        </h1>
+
+        <div class="page-subtitle">
+          Đây là các thông báo mới nhất dành cho bạn.
+        </div>
+
+
+        <div class="stats">
+
+          <div class="stat-card">
+
+            <div class="stat-label">
+              🔴 Chưa đọc
+            </div>
+
+            <div class="stat-value">
+              ${data.unreadCount}
+            </div>
+
+          </div>
+
+
+          <div class="stat-card">
+
+            <div class="stat-label">
+              📢 Thông báo
+            </div>
+
+            <div class="stat-value">
+              ${data.totalAnnouncements}
+            </div>
+
+          </div>
+
+
+          <div class="stat-card">
+
+            <div class="stat-label">
+              📌 Quan trọng
+            </div>
+
+            <div class="stat-value">
+              ${data.pinned.length}
+            </div>
+
+          </div>
+
+
+          <div class="stat-card">
+
+            <div class="stat-label">
+              ⚠️ Khẩn cấp
+            </div>
+
+            <div class="stat-value">
+              ${data.urgent.length}
+            </div>
+
+          </div>
+
+        </div>
+
+
+        <h2>
+          📢 Thông báo mới nhất
+        </h2>
+
+        <div
+          id="homeAnnouncements"
+          class="announcement-list"
+        ></div>
+
+      `;
+
+
+      this.renderAnnouncementList(
+        data.latest,
+        document.getElementById(
+          'homeAnnouncements'
+        )
+      );
+
+    } finally {
+
+      this.loading(false);
+
+    }
+  },
+
+
+  async renderAnnouncements(main) {
+
+    main.innerHTML = `
+
+      <h1 class="page-title">
+        📢 Thông báo
+      </h1>
+
+      <div class="page-subtitle">
+        Tìm kiếm và lọc các thông báo dành cho bạn.
+      </div>
+
+
+      <div class="filter-box">
+
+        <input
+          id="filterSearch"
+          class="input search"
+          placeholder="🔎 Tìm tiêu đề, nội dung, bộ phận, từ khóa, mã..."
+          value="${escapeHtml(
+            this.state.filters.search
+          )}"
+        >
+
+
+        <input
+          id="filterMonth"
+          class="input"
+          type="month"
+          value="${this.state.filters.month}"
+        >
+
+
+        <select
+          id="filterType"
+          class="select"
+        >
+          <option value="">
+            🏷️ Tất cả loại
+          </option>
+
+          ${typeOptions(
+            this.state.filters.type
+          )}
+        </select>
+
+
+        <label
+          style="
+            display:flex;
+            align-items:center;
+            gap:8px;
+            padding:10px;
+          "
+        >
+
+          <input
+            type="checkbox"
+            id="filterUnread"
+            ${
+              this.state.filters.unread
+              ? 'checked'
+              : ''
+            }
+          >
+
+          🔴 Chưa đọc
+
+        </label>
+
+
+        <button
+          class="btn btn-primary"
+          onclick="App.applyFilters()"
+        >
+          LỌC
+        </button>
+
+      </div>
+
+
+      <div
+        id="announcementResults"
+        class="announcement-list"
+      ></div>
+
+    `;
+
+
+    await this.loadAnnouncements();
+  },
+
+
+  async applyFilters() {
+
+    this.state.filters.search =
+      document
+        .getElementById(
+          'filterSearch'
+        )
+        .value;
+
+    this.state.filters.month =
+      document
+        .getElementById(
+          'filterMonth'
+        )
+        .value;
+
+    this.state.filters.type =
+      document
+        .getElementById(
+          'filterType'
+        )
+        .value;
+
+    this.state.filters.unread =
+      document
+        .getElementById(
+          'filterUnread'
+        )
+        .checked;
+
+    await this.loadAnnouncements();
+  },
+
+
+  async loadAnnouncements() {
+
+    this.loading(true);
+
+    try {
+
+      const data =
+        await API.announcements(
+          this.state.token,
+          this.state.filters
+        );
+
+      this.state.announcements =
+        data.announcements;
+
+      const container =
+        document.getElementById(
+          'announcementResults'
+        );
+
+      if (container) {
+
+        this.renderAnnouncementList(
+          data.announcements,
+          container
+        );
+      }
+
+    } finally {
+
+      this.loading(false);
+    }
+  },
+
+
+  renderAnnouncementList(
+    list,
+    container
+  ) {
+
+    if (!list.length) {
+
+      container.innerHTML = `
+        <div class="empty">
+          📭 Không có thông báo phù hợp.
+        </div>
+      `;
+
+      return;
+    }
+
+
+    container.innerHTML =
+      list.map(
+        a => `
+
+        <article
+          class="
+            announcement-card
+            ${a.read ? '' : 'unread'}
+            ${a.pinned ? 'pinned' : ''}
+          "
+          onclick="
+            App.openAnnouncement(
+              '${escapeAttr(a.id)}'
+            )
+          "
+        >
+
+          <div class="announcement-head">
+
+            <div class="type-icon">
+              ${a.typeIcon}
+            </div>
+
+            <div style="flex:1">
+
+              <div class="announcement-title">
+
+                ${
+                  a.pinned
+                  ? '📌 '
+                  : ''
+                }
+
+                ${
+                  !a.read
+                  ? '<span style="color:#dc2626">●</span> '
+                  : ''
+                }
+
+                ${escapeHtml(
+                  a.title
+                )}
+
+              </div>
+
+
+              <div class="announcement-meta">
+
+                ${escapeHtml(
+                  a.publishDate
+                )}
+
+                ·
+
+                ${escapeHtml(
+                  a.author
+                )}
+
+              </div>
+
+            </div>
+
+          </div>
+
+
+          <div class="announcement-preview">
+
+            ${escapeHtml(
+              stripHtml(
+                a.content
+              ).substring(
+                0,
+                220
+              )
+            )}
+
+            ${
+              stripHtml(
+                a.content
+              ).length > 220
+              ? '...'
+              : ''
+            }
+
+          </div>
+
+
+          <div class="badges">
+
+            <span class="badge">
+              ${a.typeIcon}
+              ${escapeHtml(
+                a.typeLabel
+              )}
+            </span>
+
+
+            ${
+              a.read
+              ? `
+                <span class="badge">
+                  ✓ Đã đọc
+                </span>
+              `
+              : `
+                <span class="badge badge-unread">
+                  🔴 Chưa đọc
+                </span>
+              `
+            }
+
+
+            ${
+              a.pinned
+              ? `
+                <span class="badge badge-pinned">
+                  📌 Đã ghim
+                </span>
+              `
+              : ''
+            }
+
+
+            ${
+              a.type === 'URGENT'
+              ? `
+                <span class="badge badge-urgent">
+                  ⚠️ KHẨN CẤP
+                </span>
+              `
+              : ''
+            }
+
+          </div>
+
+        </article>
+
+      `
+      ).join('');
+  },
+
+
+  async openAnnouncement(id) {
+
+    this.loading(true);
+
+    try {
+
+      const data =
+        await API.detail(
+          this.state.token,
+          id
+        );
+
+      const a =
+        data.announcement;
+
+      const attachment =
+        a.attachment
+        ? `
+          <div class="attachment">
+
+            📎 <strong>
+              File đính kèm
+            </strong>
+
+            <br><br>
+
+            <a
+              class="btn btn-primary"
+              target="_blank"
+              href="${escapeAttr(
+                a.attachment
+              )}"
+            >
+              Mở file
+            </a>
+
+          </div>
+        `
+        : '';
+
+
+      document
+        .getElementById(
+          'mainContent'
+        )
+        .innerHTML = `
+
+        <button
+          class="btn btn-secondary"
+          onclick="App.navigate('announcements')"
+        >
+          ← Quay lại
+        </button>
+
+        <br><br>
+
+        <article class="detail">
+
+          <div class="badges">
+
+            <span class="badge">
+              ${a.typeIcon}
+              ${escapeHtml(
+                a.typeLabel
+              )}
+            </span>
+
+            ${
+              a.pinned
+              ? `
+                <span class="badge badge-pinned">
+                  📌 Ghim
+                </span>
+              `
+              : ''
+            }
+
+          </div>
+
+
+          <h1 class="detail-title">
+            ${escapeHtml(
+              a.title
+            )}
+          </h1>
+
+
+          <div class="announcement-meta">
+
+            ${escapeHtml(
+              a.publishDate
+            )}
+
+            ·
+
+            Người đăng:
+            ${escapeHtml(
+              a.author
+            )}
+
+          </div>
+
+
+          <div class="detail-content">
+
+            ${safeHtml(
+              a.content
+            )}
+
+          </div>
+
+
+          ${attachment}
+
+
+          <div
+            style="
+              margin-top:25px;
+              color:#16a34a;
+              font-weight:700;
+            "
+          >
+            ✓ Đã đọc
+          </div>
+
+        </article>
+
+      `;
+
+    } finally {
+
+      this.loading(false);
+
+    }
+  },
+
+
+  async renderImportant(main) {
+
+    this.state.filters =
+      {
+        search: '',
+        month: '',
+        type: '',
+        unread: false
+      };
+
+    const data =
+      await API.announcements(
+        this.state.token,
+        {}
+      );
+
+    const list =
+      data.announcements
+        .filter(
+          a =>
+            a.pinned ||
+            a.type === 'URGENT' ||
+            a.priority === 'HIGH'
+        );
+
+    main.innerHTML = `
+
+      <h1 class="page-title">
+        📌 Quan trọng
+      </h1>
+
+      <div
+        id="importantList"
+        class="announcement-list"
+      ></div>
+    `;
+
+    this.renderAnnouncementList(
+      list,
+      document.getElementById(
+        'importantList'
+      )
+    );
+  },
+
+
+  renderProfile(main) {
+
+    const u =
+      this.state.user;
+
+    main.innerHTML = `
+
+      <h1 class="page-title">
+        👤 Cá nhân
+      </h1>
+
+      <div class="detail">
+
+        <div class="form-group">
+
+          <label>
+            Mã nhân viên
+          </label>
+
+          <input
+            class="input"
+            readonly
+            value="${escapeAttr(
+              u.EmployeeID
+            )}"
+          >
+
+        </div>
+
+
+        <div class="form-group">
+
+          <label>
+            Họ và tên
+          </label>
+
+          <input
+            class="input"
+            readonly
+            value="${escapeAttr(
+              u.FullName
+            )}"
+          >
+
+        </div>
+
+
+        <div class="form-group">
+
+          <label>
+            Bộ phận
+          </label>
+
+          <input
+            class="input"
+            readonly
+            value="${escapeAttr(
+              u.Department
+            )}"
+          >
+
+        </div>
+
+
+        <div class="form-group">
+
+          <label>
+            Chức vụ
+          </label>
+
+          <input
+            class="input"
+            readonly
+            value="${escapeAttr(
+              u.Position
+            )}"
+          >
+
+        </div>
+
+      </div>
+    `;
+  },
+
+
+  async renderAdmin(main) {
+
+    this.loading(true);
+
+    try {
+
+      const stats =
+        await API.adminDashboard(
+          this.state.token
+        );
+
+      const data =
+        await API.adminAnnouncements(
+          this.state.token
+        );
+
+
+      main.innerHTML = `
+
+        <div class="admin-toolbar">
+
+          <div>
+
+            <h1 class="page-title">
+              ⚙️ QUẢN LÝ THÔNG BÁO
+            </h1>
+
+            <div class="page-subtitle">
+              Quản lý, đăng và theo dõi thông báo.
+            </div>
+
+          </div>
+
+
+          <button
+            class="btn btn-primary"
+            onclick="App.showCreateAnnouncement()"
+          >
+            ＋ Tạo thông báo mới
+          </button>
+
+        </div>
+
+
+        <div class="stats">
+
+          <div class="stat-card">
+            <div class="stat-label">
+              Nhân viên
+            </div>
+            <div class="stat-value">
+              ${stats.activeEmployees}
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-label">
+              Thông báo
+            </div>
+            <div class="stat-value">
+              ${stats.announcements}
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-label">
+              Published
+            </div>
+            <div class="stat-value">
+              ${stats.publishedAnnouncements}
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-label">
+              Lượt đọc
+            </div>
+            <div class="stat-value">
+              ${stats.totalReads}
+            </div>
+          </div>
+
+        </div>
+
+
+        <div class="table-wrap">
+
+          <table>
+
+            <thead>
+
+              <tr>
+
+                <th>
+                  Ngày
+                </th>
+
+                <th>
+                  Tiêu đề
+                </th>
+
+                <th>
+                  Loại
+                </th>
+
+                <th>
+                  Người đăng
+                </th>
+
+                <th>
+                  Trạng thái
+                </th>
+
+                <th>
+                  Đối tượng
+                </th>
+
+                <th>
+                  Thao tác
+                </th>
+
+              </tr>
+
+            </thead>
+
+
+            <tbody>
+
+              ${
+                data.announcements
+                  .map(
+                    a => `
+
+                    <tr>
+
+                      <td>
+                        ${formatDateDisplay(
+                          a.PublishDate
+                        )}
+                      </td>
+
+                      <td>
+                        ${
+                          String(a.Pinned)
+                          .toUpperCase()
+                          === 'TRUE'
+                          ? '📌 '
+                          : ''
+                        }
+
+                        <strong>
+                          ${escapeHtml(
+                            a.Title
+                          )}
+                        </strong>
+
+                      </td>
+
+                      <td>
+                        ${getTypeIconClient(
+                          a.Type
+                        )}
+
+                        ${escapeHtml(
+                          a.Type
+                        )}
+                      </td>
+
+                      <td>
+                        ${escapeHtml(
+                          a.Author
+                        )}
+                      </td>
+
+                      <td>
+                        ${escapeHtml(
+                          a.Status
+                        )}
+                      </td>
+
+                      <td>
+                        ${escapeHtml(
+                          a.TargetType || 'ALL'
+                        )}
+                      </td>
+
+                      <td>
+
+                        <div class="actions">
+
+                          <button
+                            class="btn btn-secondary"
+                            onclick="
+                              App.adminView(
+                                '${escapeAttr(a.ID)}'
+                              )
+                            "
+                          >
+                            👁️
+                          </button>
+
+                          <button
+                            class="btn btn-secondary"
+                            onclick="
+                              App.pin(
+                                '${escapeAttr(a.ID)}'
+                              )
+                            "
+                          >
+                            📌
+                          </button>
+
+                          <button
+                            class="btn btn-danger"
+                            onclick="
+                              App.deleteAnnouncement(
+                                '${escapeAttr(a.ID)}'
+                              )
+                            "
+                          >
+                            🗑️
+                          </button>
+
+                        </div>
+
+                      </td>
+
+                    </tr>
+                  `
+                  )
+                  .join('')
+              }
+
+            </tbody>
+
+          </table>
+
+        </div>
+
+      `;
+
+    } finally {
+
+      this.loading(false);
+
+    }
+  },
+
+
+  showCreateAnnouncement() {
+
+    const modal =
+      document.createElement(
+        'div'
+      );
+
+    modal.className =
+      'modal';
+
+    modal.id =
+      'announcementModal';
+
+    modal.innerHTML = `
+
+      <div class="modal-box">
+
+        <div class="modal-title">
+          ＋ Tạo thông báo mới
+        </div>
+
+
+        <div class="form-group">
+
+          <label>
+            Tiêu đề *
+          </label>
+
+          <input
+            id="aTitle"
+            class="input"
+            placeholder="THÔNG BÁO LỊCH NGHỈ LỄ 2/9"
+          >
+
+        </div>
+
+
+        <div class="form-group">
+
+          <label>
+            Loại *
+          </label>
+
+          <select
+            id="aType"
+            class="select"
+          >
+            ${typeOptions()}
+          </select>
+
+        </div>
+
+
+        <div class="form-group">
+
+          <label>
+            Nội dung *
+          </label>
+
+          <textarea
+            id="aContent"
+            class="textarea"
+            placeholder="Nội dung thông báo..."
+          ></textarea>
+
+        </div>
+
+
+        <div class="form-group">
+
+          <label>
+            Từ khóa
+          </label>
+
+          <input
+            id="aKeywords"
+            class="input"
+            placeholder="nghỉ lễ, 2/9, lịch nghỉ"
+          >
+
+        </div>
+
+
+        <div class="form-group">
+
+          <label>
+            Đối tượng
+          </label>
+
+          <select
+            id="aTargetType"
+            class="select"
+            onchange="App.updateTargetInput()"
+          >
+
+            <option value="ALL">
+              🌎 Toàn công ty
+            </option>
+
+            <option value="DEPARTMENT">
+              📍 Bộ phận
+            </option>
+
+            <option value="EMPLOYEE">
+              👤 Nhân viên
+            </option>
+
+          </select>
+
+        </div>
+
+
+        <div
+          id="targetValueBox"
+          class="form-group hidden"
+        >
+
+          <label>
+            Giá trị đối tượng
+          </label>
+
+          <input
+            id="aTargetValue"
+            class="input"
+            placeholder="Ví dụ: Xưởng Bánh hoặc NV000123,NV000456"
+          >
+
+        </div>
+
+
+        <div class="form-group">
+
+          <label>
+            Mức độ
+          </label>
+
+          <select
+            id="aPriority"
+            class="select"
+          >
+
+            <option value="NORMAL">
+              Bình thường
+            </option>
+
+            <option value="HIGH">
+              Quan trọng
+            </option>
+
+            <option value="URGENT">
+              Khẩn cấp
+            </option>
+
+          </select>
+
+        </div>
+
+
+        <div class="form-group">
+
+          <label>
+            Hẹn giờ đăng
+          </label>
+
+          <input
+            id="aScheduledAt"
+            type="datetime-local"
+            class="input"
+          >
+
+        </div>
+
+
+        <div class="form-group">
+
+          <label>
+            <input
+              id="aPinned"
+              type="checkbox"
+            >
+
+            📌 Ghim thông báo
+          </label>
+
+        </div>
+
+
+        <div class="form-group">
+
+          <label>
+            File đính kèm
+          </label>
+
+          <input
+            id="aAttachment"
+            type="file"
+            class="input"
+            accept="
+              image/*,
+              video/*,
+              .pdf,
+              .doc,
+              .docx,
+              .xls,
+              .xlsx,
+              .ppt,
+              .pptx
+            "
+          >
+
+        </div>
+
+
+        <div
+          style="
+            display:flex;
+            gap:10px;
+            justify-content:flex-end;
+          "
+        >
+
+          <button
+            class="btn btn-secondary"
+            onclick="App.closeModal()"
+          >
+            Hủy
+          </button>
+
+          <button
+            class="btn btn-primary"
+            onclick="App.createAnnouncement()"
+          >
+            ĐĂNG THÔNG BÁO
+          </button>
+
+        </div>
+
+      </div>
+    `;
+
+    document.body.appendChild(
+      modal
+    );
+  },
+
+
+  updateTargetInput() {
+
+    const type =
+      document
+        .getElementById(
+          'aTargetType'
+        )
+        .value;
+
+    const box =
+      document
+        .getElementById(
+          'targetValueBox'
+        );
+
+    if (type === 'ALL') {
+      box.classList.add(
+        'hidden'
+      );
+    } else {
+      box.classList.remove(
+        'hidden'
+      );
+    }
+  },
+
+
+  async createAnnouncement() {
+
+    try {
+
+      this.loading(true);
+
+      let attachment = '';
+
+
+      const fileInput =
+        document
+          .getElementById(
+            'aAttachment'
+          );
+
+      if (
+        fileInput.files.length
+      ) {
+
+        attachment =
+          await this.uploadFile(
+            fileInput.files[0]
+          );
+      }
+
+
+      const data = {
+
+        title:
+          document
+            .getElementById(
+              'aTitle'
+            )
+            .value,
+
+        type:
+          document
+            .getElementById(
+              'aType'
+            )
+            .value,
+
+        content:
+          document
+            .getElementById(
+              'aContent'
+            )
+            .value,
+
+        keywords:
+          document
+            .getElementById(
+              'aKeywords'
+            )
+            .value,
+
+        targetType:
+          document
+            .getElementById(
+              'aTargetType'
+            )
+            .value,
+
+        targetValue:
+          document
+            .getElementById(
+              'aTargetValue'
+            )
+            .value,
+
+        priority:
+          document
+            .getElementById(
+              'aPriority'
+            )
+            .value,
+
+        pinned:
+          document
+            .getElementById(
+              'aPinned'
+            )
+            .checked,
+
+        scheduledAt:
+          document
+            .getElementById(
+              'aScheduledAt'
+            )
+            .value,
+
+        attachment:
+          attachment
+
+      };
+
+
+      await API.createAnnouncement(
+        this.state.token,
+        data
+      );
+
+
+      this.closeModal();
+
+      alert(
+        'Đã tạo thông báo thành công.'
+      );
+
+      this.renderAdmin(
+        document.getElementById(
+          'mainContent'
+        )
+      );
+
+    } catch (e) {
+
+      alert(e.message);
+
+    } finally {
+
+      this.loading(false);
+
+    }
+  },
+
+
+  async uploadFile(file) {
+
+    const base64 =
+      await readFileBase64(
+        file
+      );
+
+    const result =
+      await API.uploadAttachment(
+        this.state.token,
+        {
+          name:
+            file.name,
+
+          mimeType:
+            file.type,
+
+          base64:
+            base64
+        }
+      );
+
+    return result.downloadUrl;
+  },
+
+
+  async pin(id) {
+
+    try {
+
+      await API.pin(
+        this.state.token,
+        id
+      );
+
+      this.renderAdmin(
+        document.getElementById(
+          'mainContent'
+        )
+      );
+
+    } catch (e) {
+
+      alert(e.message);
+    }
+  },
+
+
+  async deleteAnnouncement(id) {
+
+    if (
+      !confirm(
+        'Bạn chắc chắn muốn xóa thông báo này?'
+      )
+    ) return;
+
+
+    try {
+
+      await API.deleteAnnouncement(
+        this.state.token,
+        id
+      );
+
+      this.renderAdmin(
+        document.getElementById(
+          'mainContent'
+        )
+      );
+
+    } catch (e) {
+
+      alert(e.message);
+    }
+  },
+
+
+  async adminView(id) {
+
+    await this.openAnnouncement(
+      id
+    );
+  },
+
+
+  closeModal() {
+
+    const modal =
+      document.getElementById(
+        'announcementModal'
+      );
+
+    if (modal) {
+      modal.remove();
+    }
+  },
+
+
+  logout() {
+
+    try {
+
+      API.logout(
+        this.state.token
+      );
+
+    } catch (e) {}
+
+    this.logoutLocal();
+
+    this.renderLogin();
+  },
+
+
+  logoutLocal() {
+
+    localStorage.removeItem(
+      'company_portal_token'
+    );
+
+    this.state.token =
+      null;
+
+    this.state.user =
+      null;
+  },
+
+
+  loading(show) {
+
+    let el =
+      document.getElementById(
+        'loading'
+      );
+
+    if (
+      show &&
+      !el
+    ) {
+
+      el =
+        document.createElement(
+          'div'
+        );
+
+      el.id =
+        'loading';
+
+      el.className =
+        'loading';
+
+      el.innerHTML =
+        '<div class="spinner"></div>';
+
+      document.body.appendChild(
+        el
+      );
+
+    } else if (
+      !show &&
+      el
+    ) {
+
+      el.remove();
+
+    }
+  }
+
+};
+
+
+App.start();
+
+</script>
