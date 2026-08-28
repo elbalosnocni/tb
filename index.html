@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Cổng thông báo nội bộ</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+body{font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f5f7fb;color:#172033}
+.card{background:#fff;border:1px solid #e7eaf0;border-radius:18px;box-shadow:0 4px 18px rgba(20,35,60,.05)}
+.btn{border-radius:12px;padding:.65rem 1rem;font-weight:700;transition:.15s}.btn:disabled{opacity:.5}.btn-primary{background:#1d4ed8;color:#fff}.btn-primary:hover{background:#1e40af}.btn-light{background:#f1f5f9}.btn-danger{background:#dc2626;color:#fff}.input{width:100%;border:1px solid #d8dee9;border-radius:12px;padding:.72rem .85rem;outline:none;background:#fff}.input:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.1)}
+.hidden{display:none!important}.badge{display:inline-flex;align-items:center;border-radius:999px;padding:.22rem .6rem;font-size:12px;font-weight:800;background:#eef2ff;color:#3730a3}
+.proseish{white-space:pre-wrap;line-height:1.7}.navbtn{padding:.65rem .85rem;border-radius:10px;font-weight:700}.navbtn.active{background:#dbeafe;color:#1d4ed8}
+.modal{position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:50;display:flex;align-items:center;justify-content:center;padding:16px}.modalbox{background:#fff;border-radius:20px;width:min(100%,900px);max-height:92vh;overflow:auto}
+@media(max-width:640px){.card{border-radius:14px}.hide-mobile{display:none}.modal{padding:8px}}
+</style>
+</head>
+<body>
+<div id="toast" class="fixed top-4 right-4 z-[100] hidden"></div>
+
+<!-- SETUP -->
+<section id="setupView" class="min-h-screen flex items-center justify-center p-5 hidden">
+ <div class="card w-full max-w-md p-7">
+  <div class="text-center mb-6"><div class="text-5xl mb-2">🏭</div><h1 class="text-2xl font-black">Cổng thông báo nội bộ</h1><p class="text-slate-500 mt-1">Khởi tạo hệ thống lần đầu</p></div>
+  <div class="bg-amber-50 text-amber-800 rounded-xl p-4 text-sm mb-5">Tài khoản ADMIN sẽ được tạo. Sau khi đăng nhập, hãy đổi mật khẩu ngay.</div>
+  <label class="text-sm font-bold">Mật khẩu ADMIN</label>
+  <input id="setupPass" type="password" class="input mt-2" placeholder="Ít nhất 8 ký tự">
+  <button id="setupBtn" class="btn btn-primary w-full mt-4" onclick="initializeSystem()">🚀 Khởi tạo hệ thống</button>
+ </div>
+</section>
+
+<!-- LOGIN -->
+<section id="loginView" class="min-h-screen flex items-center justify-center p-5 hidden">
+ <div class="card w-full max-w-md p-7">
+  <div class="text-center mb-7"><div class="text-5xl mb-2">🏭</div><h1 class="text-2xl font-black">COMPANY</h1><p class="font-bold text-blue-700">THÔNG BÁO NỘI BỘ</p></div>
+  <label class="text-sm font-bold">Mã nhân viên / Tài khoản</label>
+  <input id="loginUser" class="input mt-2" autocomplete="username" placeholder="NV000123">
+  <label class="text-sm font-bold block mt-4">Mật khẩu</label>
+  <input id="loginPass" type="password" class="input mt-2" autocomplete="current-password" placeholder="••••••••">
+  <button id="loginBtn" class="btn btn-primary w-full mt-5" onclick="login()">ĐĂNG NHẬP</button>
+  <p class="text-xs text-slate-400 text-center mt-4">Hệ thống thông báo nội bộ</p>
+ </div>
+</section>
+
+<!-- APP -->
+<div id="appView" class="hidden min-h-screen">
+<header class="bg-white border-b sticky top-0 z-30">
+ <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+  <div class="flex items-center gap-3"><div class="text-2xl">🏭</div><div><div class="font-black">COMPANY</div><div class="text-xs text-blue-700 font-bold">CỔNG THÔNG BÁO NỘI BỘ</div></div></div>
+  <div class="flex items-center gap-2"><span id="userBadge" class="badge"></span><button class="btn btn-light text-sm" onclick="logout()">Đăng xuất</button></div>
+ </div>
+</header>
+<div class="max-w-7xl mx-auto px-4 py-5">
+ <div class="grid lg:grid-cols-[220px_1fr] gap-5">
+  <aside class="card p-3 h-fit lg:sticky lg:top-20">
+   <div class="px-3 py-3"><div id="hello" class="font-black"></div><div id="subhello" class="text-xs text-slate-500 mt-1"></div></div>
+   <nav class="space-y-1">
+    <button class="navbtn w-full text-left active" id="navHome" onclick="showPage('home')">🏠 Trang chủ</button>
+    <button class="navbtn w-full text-left" id="navImportant" onclick="showPage('important')">📌 Quan trọng</button>
+    <button class="navbtn w-full text-left" id="navProfile" onclick="showPage('profile')">👤 Cá nhân</button>
+    <div id="adminNav" class="hidden pt-3 mt-3 border-t">
+     <div class="px-3 text-[11px] uppercase text-slate-400 font-black mb-1">Quản trị</div>
+     <button class="navbtn w-full text-left" onclick="showPage('admin')">⚙️ Quản lý thông báo</button>
+     <button class="navbtn w-full text-left" onclick="showPage('employees')">👥 Nhân viên</button>
+    </div>
+   </nav>
+  </aside>
+  <main>
+   <!-- HOME -->
+   <section id="pageHome">
+    <div class="mb-5"><h2 class="text-2xl font-black">Thông báo</h2><p class="text-slate-500">Thông báo mới nhất luôn ở trên.</p></div>
+    <div class="card p-4 mb-5">
+     <div class="grid md:grid-cols-4 gap-3">
+      <input id="search" class="input md:col-span-2" placeholder="🔎 Tìm tiêu đề, nội dung, bộ phận, từ khóa, mã..." oninput="debounceLoad()">
+      <select id="month" class="input" onchange="loadAnnouncements()"><option value="">📅 Tất cả tháng</option></select>
+      <select id="type" class="input" onchange="loadAnnouncements()"><option value="">🏷️ Tất cả loại</option></select>
+     </div>
+     <div class="grid md:grid-cols-3 gap-3 mt-3">
+      <select id="department" class="input" onchange="loadAnnouncements()"><option value="">📍 Tất cả bộ phận</option></select>
+      <label class="flex items-center gap-2 px-3"><input id="unreadOnly" type="checkbox" onchange="loadAnnouncements()"> <span class="font-bold text-sm">🔴 Chưa đọc</span></label>
+      <div class="text-right text-sm text-slate-500 pt-2" id="resultCount"></div>
+     </div>
+    </div>
+    <div id="announcementList" class="space-y-3"></div>
+   </section>
+
+   <!-- IMPORTANT -->
+   <section id="pageImportant" class="hidden">
+    <div class="mb-5"><h2 class="text-2xl font-black">📌 Quan trọng</h2><p class="text-slate-500">Thông báo được ghim hoặc ưu tiên cao.</p></div>
+    <div id="importantList" class="space-y-3"></div>
+   </section>
+
+   <!-- PROFILE -->
+   <section id="pageProfile" class="hidden">
+    <div class="mb-5"><h2 class="text-2xl font-black">👤 Cá nhân</h2></div>
+    <div class="card p-5" id="profileBox"></div>
+    <div class="card p-5 mt-4"><h3 class="font-black mb-3">Đổi mật khẩu</h3>
+      <div class="grid md:grid-cols-3 gap-3"><input id="oldPass" type="password" class="input" placeholder="Mật khẩu hiện tại"><input id="newPass" type="password" class="input" placeholder="Mật khẩu mới"><button class="btn btn-primary" onclick="changePassword()">Đổi mật khẩu</button></div>
+    </div>
+   </section>
+
+   <!-- ADMIN -->
+   <section id="pageAdmin" class="hidden">
+    <div class="flex flex-wrap justify-between items-center gap-3 mb-5"><div><h2 class="text-2xl font-black">QUẢN LÝ THÔNG BÁO</h2><p class="text-slate-500">Tạo, sửa, ghim, hẹn giờ và theo dõi lượt đọc.</p></div><button class="btn btn-primary" onclick="openEditor()">＋ Tạo thông báo mới</button></div>
+    <div class="card p-4 mb-4"><input id="adminSearch" class="input" placeholder="🔎 Tìm kiếm..." oninput="loadAdminAnnouncements()"></div>
+    <div id="adminStats" class="grid md:grid-cols-3 gap-3 mb-4"></div>
+    <div class="card overflow-auto"><table class="w-full text-sm min-w-[900px]"><thead class="bg-slate-50"><tr><th class="p-3 text-left">Ngày</th><th class="p-3 text-left">Tiêu đề</th><th class="p-3">Loại</th><th class="p-3">Người đăng</th><th class="p-3">Trạng thái</th><th class="p-3">Thao tác</th></tr></thead><tbody id="adminTable"></tbody></table></div>
+   </section>
+
+   <!-- EMPLOYEES -->
+   <section id="pageEmployees" class="hidden">
+    <div class="flex flex-wrap justify-between gap-3 mb-5"><div><h2 class="text-2xl font-black">👥 Nhân viên</h2><p class="text-slate-500">Import Excel, không tạo trùng và không xóa dữ liệu cũ.</p></div><label class="btn btn-primary cursor-pointer">📥 Import Excel<input id="excelFile" type="file" accept=".xlsx,.xls,.csv" class="hidden" onchange="readExcel(this.files[0])"></label></div>
+    <div id="importBox" class="card p-5 hidden"></div>
+    <div class="card p-4"><input id="empSearch" class="input" placeholder="🔎 Tìm mã, tên, bộ phận..." oninput="loadEmployees()"><div id="employeeTable" class="mt-4 overflow-auto"></div></div>
+    <div class="card p-4 mt-4"><h3 class="font-black mb-3">Lịch sử Import</h3><div id="importHistory"></div></div>
+   </section>
+  </main>
+ </div>
+</div>
+
+<!-- DETAIL MODAL -->
+<div id="detailModal" class="modal hidden" onclick="if(event.target===this)closeModal('detailModal')">
+ <div class="modalbox p-5"><div class="flex justify-between gap-3"><div><span id="detailType" class="badge"></span><h2 id="detailTitle" class="text-2xl font-black mt-2"></h2><div id="detailMeta" class="text-sm text-slate-500 mt-1"></div></div><button class="btn btn-light" onclick="closeModal('detailModal')">✕</button></div><div id="detailContent" class="proseish mt-5"></div><div id="detailFiles" class="mt-5"></div><div class="mt-5 pt-4 border-t flex justify-between"><span id="detailRead" class="font-bold text-emerald-600"></span><button id="detailStatsBtn" class="btn btn-light hidden" onclick="showReadStats(currentDetailId)">📊 Thống kê đã đọc</button></div></div>
+</div>
+
+<!-- EDITOR -->
+<div id="editorModal" class="modal hidden" onclick="if(event.target===this)closeModal('editorModal')">
+ <div class="modalbox p-5">
+  <div class="flex justify-between"><h2 id="editorTitle" class="text-xl font-black">Tạo thông báo</h2><button class="btn btn-light" onclick="closeModal('editorModal')">✕</button></div>
+  <input id="editId" type="hidden">
+  <div class="grid md:grid-cols-2 gap-3 mt-4">
+   <div class="md:col-span-2"><label class="text-sm font-bold">Tiêu đề *</label><input id="editTitle" class="input mt-1"></div>
+   <div><label class="text-sm font-bold">Loại</label><select id="editType" class="input mt-1"></select></div>
+   <div><label class="text-sm font-bold">Ưu tiên</label><select id="editPriority" class="input mt-1"><option value="NORMAL">Bình thường</option><option value="HIGH">Cao</option><option value="URGENT">Khẩn cấp</option><option value="LOW">Thấp</option></select></div>
+   <div><label class="text-sm font-bold">Ngày đăng</label><input id="editPublish" type="datetime-local" class="input mt-1"></div>
+   <div><label class="text-sm font-bold">Hẹn giờ đăng</label><input id="editScheduled" type="datetime-local" class="input mt-1"></div>
+   <div class="md:col-span-2"><label class="text-sm font-bold">Nội dung *</label><textarea id="editContent" rows="10" class="input mt-1"></textarea></div>
+   <div class="md:col-span-2"><label class="text-sm font-bold">Từ khóa</label><input id="editKeywords" class="input mt-1" placeholder="nghỉ lễ, 2/9, lịch nghỉ"></div>
+  </div>
+  <div class="mt-4 card p-4 bg-slate-50">
+   <div class="font-black mb-2">🎯 Đối tượng xem</div>
+   <div id="targetRows"></div>
+   <button class="btn btn-light mt-2" onclick="addTargetRow()">＋ Thêm đối tượng</button>
+  </div>
+  <div class="mt-4 card p-4 bg-slate-50">
+   <div class="font-black">📎 File đính kèm</div>
+   <p class="text-xs text-slate-500 mt-1">PDF, Word, Excel, PowerPoint, hình ảnh, video. Tối đa 20 MB/file.</p>
+   <input id="attachmentFiles" type="file" multiple class="mt-3" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.webp,.gif,.mp4,.webm,.mov">
+   <div id="pendingFiles" class="text-sm mt-2"></div>
+  </div>
+  <div class="mt-5 flex justify-end gap-2"><button class="btn btn-light" onclick="closeModal('editorModal')">Hủy</button><button class="btn btn-primary" onclick="saveAnnouncement()">💾 Lưu thông báo</button></div>
+ </div>
+</div>
+
+<!-- READ STATS -->
+<div id="statsModal" class="modal hidden" onclick="if(event.target===this)closeModal('statsModal')">
+ <div class="modalbox p-5"><div class="flex justify-between"><h2 class="text-xl font-black">📊 Thống kê lượt đọc</h2><button class="btn btn-light" onclick="closeModal('statsModal')">✕</button></div><div id="statsBox" class="mt-4"></div></div>
+</div>
+
+<script>
+let token=sessionStorage.getItem('portalToken')||'', me=null, currentDetailId='', debounceTimer=null, pendingImport=null;
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function toast(msg,type='info'){const t=$('toast');t.className='fixed top-4 right-4 z-[100] p-4 rounded-xl shadow-lg text-sm font-bold '+(type==='error'?'bg-red-600 text-white':'bg-slate-900 text-white');t.textContent=msg;t.classList.remove('hidden');setTimeout(()=>t.classList.add('hidden'),3200)}
+function call(action,data={}){return new Promise((resolve,reject)=>{if(!(typeof google!=='undefined'&&google.script&&google.script.run))return reject(new Error('Hãy mở Web App bằng URL /exec, không mở file HTML trực tiếp.'));google.script.run.withSuccessHandler(resolve).withFailureHandler(e=>reject(new Error(e?.message||e))).api(action,token,data)})}
+function fmtDate(v){if(!v)return '';const d=new Date(v);return isNaN(d)?String(v):d.toLocaleString('vi-VN',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}
+function localInput(v){if(!v)return '';const d=new Date(v);if(isNaN(d))return '';const p=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':'+p(d.getMinutes())}
+function show(id){$(id).classList.remove('hidden')} function hide(id){$(id).classList.add('hidden')}
+function closeModal(id){hide(id)}
+async function boot(){try{const r=await callNoToken('BOOTSTRAP',{}); if(!r.initialized){show('setupView');return} if(token){try{const x=await call('GET_ME');if(x.status==='SUCCESS'){me=x.user;enterApp();return}}catch(e){}}show('loginView')}catch(e){toast(e.message,'error');show('loginView')}}
+function callNoToken(action,data={}){return new Promise((resolve,reject)=>{google.script.run.withSuccessHandler(resolve).withFailureHandler(e=>reject(new Error(e?.message||e))).api(action,'',data)})}
+async function initializeSystem(){const p=$('setupPass').value;if(p.length<8)return toast('Mật khẩu phải có ít nhất 8 ký tự.','error');$('setupBtn').disabled=true;try{const r=await callNoToken('INITIALIZE',{password:p});if(r.status==='SUCCESS'){toast('Khởi tạo thành công');hide('setupView');show('loginView');}else toast(r.message,'error')}catch(e){toast(e.message,'error')}finally{$('setupBtn').disabled=false}}
+async function login(){const u=$('loginUser').value.trim(),p=$('loginPass').value;if(!u||!p)return toast('Vui lòng nhập tài khoản và mật khẩu.','error');$('loginBtn').disabled=true;try{const r=await callNoToken('LOGIN',{username:u,password:p});if(r.status!=='SUCCESS')return toast(r.message||'Đăng nhập thất bại','error');token=r.token;me=r.user;sessionStorage.setItem('portalToken',token);sessionStorage.setItem('portalUser',JSON.stringify(me));enterApp()}catch(e){toast(e.message,'error')}finally{$('loginBtn').disabled=false}}
+function enterApp(){hide('loginView');hide('setupView');show('appView');$('userBadge').textContent=(me.role||'USER')+' · '+(me.employeeId||me.username);$('hello').textContent='Xin chào '+(me.name||me.username);$('subhello').textContent=[me.employeeId,me.department].filter(Boolean).join(' · ');if(['ADMIN','HR ADMIN','HR'].includes(me.role))show('adminNav');loadFilters();loadAnnouncements();loadProfile()}
+async function logout(){try{await call('LOGOUT')}catch(e){}token='';me=null;sessionStorage.clear();location.reload()}
+function showPage(p){['home','important','profile','admin','employees'].forEach(x=>hide('page'+x.charAt(0).toUpperCase()+x.slice(1)));show('page'+p.charAt(0).toUpperCase()+p.slice(1));document.querySelectorAll('.navbtn').forEach(x=>x.classList.remove('active'));if(p==='home')$('navHome').classList.add('active');if(p==='important')$('navImportant').classList.add('active');if(p==='profile')$('navProfile').classList.add('active');if(p==='admin'){loadAdminAnnouncements()}if(p==='employees'){loadEmployees();loadImportHistory()}}
+async function loadFilters(){try{const r=await call('GET_FILTERS');if(r.status!=='SUCCESS')return;$('month').innerHTML='<option value="">📅 Tất cả tháng</option>'+r.months.map(m=>`<option value="${m}">${m.slice(5)}/${m.slice(0,4)}</option>`).join('');$('type').innerHTML='<option value="">🏷️ Tất cả loại</option>'+r.types.map(x=>`<option>${esc(x)}</option>`).join('');$('editType').innerHTML=r.types.map(x=>`<option>${esc(x)}</option>`).join('');$('department').innerHTML='<option value="">📍 Tất cả bộ phận</option>'+r.departments.map(x=>`<option>${esc(x)}</option>`).join('')}catch(e){}}
+function debounceLoad(){clearTimeout(debounceTimer);debounceTimer=setTimeout(loadAnnouncements,350)}
+async function loadAnnouncements(){try{const r=await call('GET_ANNOUNCEMENTS',{q:$('search').value,month:$('month').value,type:$('type').value,department:$('department').value,unreadOnly:$('unreadOnly').checked});const items=r.items||[];$('resultCount').textContent=items.length+' thông báo';$('announcementList').innerHTML=items.length?items.map(cardHtml).join(''):`<div class="card p-10 text-center text-slate-500">Không có thông báo phù hợp.</div>`;const important=items.filter(x=>x.pinned||x.priority==='HIGH'||x.priority==='URGENT');$('importantList').innerHTML=important.length?important.map(cardHtml).join(''):`<div class="card p-10 text-center text-slate-500">Chưa có thông báo quan trọng.</div>`}catch(e){toast(e.message,'error')}}
+function cardHtml(a){return `<article class="card p-4 cursor-pointer hover:shadow-md" onclick="openDetail('${esc(a.id)}')"><div class="flex gap-3"><div class="text-2xl">${a.type?.slice(0,2)||'📢'}</div><div class="min-w-0 flex-1"><div class="flex flex-wrap items-center gap-2">${a.pinned?'<span class="badge">📌 Ghim</span>':''}${!a.read?'<span class="badge bg-red-100 text-red-700">🔴 Chưa đọc</span>':'<span class="text-xs font-bold text-emerald-600">✓ Đã đọc</span>'}<span class="badge">${esc(a.type||'')}</span></div><h3 class="font-black text-lg mt-2 ${!a.read?'text-blue-800':''}">${esc(a.title)}</h3><p class="text-sm text-slate-500 mt-1 line-clamp-2">${esc(a.content)}</p><div class="text-xs text-slate-400 mt-3">${esc(a.publishDateText)} · ${esc(a.author||'')}</div></div></div></article>`}
+async function openDetail(id){currentDetailId=id;try{const r=await call('GET_ANNOUNCEMENT',{id});if(r.status!=='SUCCESS')return toast(r.message,'error');const a=r.item;$('detailType').textContent=a.type;$('detailTitle').textContent=a.title;$('detailMeta').textContent=fmtDate(a.publishDate)+' · '+(a.author||'');$('detailContent').textContent=a.content;$('detailRead').textContent=a.read?'✓ Đã đọc':'○ Chưa đọc';$('detailStatsBtn').classList.toggle('hidden',!['ADMIN','HR ADMIN','HR'].includes(me.role));$('detailFiles').innerHTML=(a.attachments||[]).length?'<h3 class="font-black mb-2">📎 Tài liệu đính kèm</h3>'+a.attachments.map(fileHtml).join(''):' ';show('detailModal');if(!a.read){await call('MARK_READ',{id});$('detailRead').textContent='✓ Đã đọc';loadAnnouncements()}}catch(e){toast(e.message,'error')}}
+function fileHtml(f){const m=f.mimeType||'',preview=f.previewUrl||'';let icon=m.startsWith('image/')?'🖼️':m.startsWith('video/')?'🎬':m==='application/pdf'?'📄':'📎';return `<div class="border rounded-xl p-3 flex items-center justify-between gap-3 mb-2"><div class="min-w-0"><div class="font-bold">${icon} ${esc(f.fileName)}</div><div class="text-xs text-slate-400">${Math.round((Number(f.size)||0)/1024)} KB</div></div><a class="btn btn-light text-sm shrink-0" target="_blank" href="${esc(preview||f.driveUrl)}">👁 Xem</a></div>`}
+async function showReadStats(id){try{const r=await call('GET_READ_STATS',{id});$('statsBox').innerHTML=`<h3 class="font-black">${esc(r.title)}</h3><div class="grid grid-cols-3 gap-3 my-4"><div class="card p-4 text-center"><div class="text-2xl font-black">${r.total}</div><div class="text-xs text-slate-500">Đối tượng</div></div><div class="card p-4 text-center"><div class="text-2xl font-black text-emerald-600">${r.read}</div><div class="text-xs text-slate-500">Đã đọc</div></div><div class="card p-4 text-center"><div class="text-2xl font-black text-red-600">${r.unread}</div><div class="text-xs text-slate-500">Chưa đọc</div></div></div><div class="text-center font-black text-lg">${r.rate}% tỷ lệ đọc</div><div class="mt-5"><h4 class="font-black mb-2">Chưa đọc</h4><div class="max-h-72 overflow-auto border rounded-xl">${(r.unreadEmployees||[]).map(e=>`<div class="p-2 border-b text-sm">${esc(e.code||e.employeeId)} · ${esc(e.name)} · ${esc(e.department)}</div>`).join('')||'<div class="p-4 text-center text-emerald-600">Tất cả đã đọc ✓</div>'}</div></div>`;show('statsModal')}catch(e){toast(e.message,'error')}}
+async function loadProfile(){if(!me)return;$('profileBox').innerHTML=`<div class="grid md:grid-cols-3 gap-4">${[['Họ tên',me.name],['Mã nhân viên',me.employeeId],['Bộ phận',me.department],['Xưởng',me.factory],['Vai trò',me.role]].map(x=>`<div><div class="text-xs text-slate-400">${x[0]}</div><div class="font-black mt-1">${esc(x[1]||'—')}</div></div>`).join('')}</div>`}
+async function changePassword(){try{const r=await call('CHANGE_PASSWORD',{oldPassword:$('oldPass').value,newPassword:$('newPass').value});if(r.status==='SUCCESS'){toast(r.message);$('oldPass').value='';$('newPass').value=''}else toast(r.message,'error')}catch(e){toast(e.message,'error')}}
+function openEditor(a=null){$('editorTitle').textContent=a?'Sửa thông báo':'Tạo thông báo';$('editId').value=a?.id||'';$('editTitle').value=a?.title||'';$('editContent').value=a?.content||'';$('editType').value=a?.type||$('editType').options[0]?.value;$('editPriority').value=a?.priority||'NORMAL';$('editPublish').value=localInput(a?.publishDate)||localInput(new Date().toISOString());$('editScheduled').value=localInput(a?.scheduledAt);$('editKeywords').value=a?.keywords||'';$('targetRows').innerHTML='';(a?.targets?.length?a.targets:[{type:'ALL',value:'ALL'}]).forEach(addTargetRow);$('pendingFiles').textContent='';show('editorModal')}
+function addTargetRow(t={type:'ALL',value:'ALL'}){const div=document.createElement('div');div.className='grid grid-cols-[140px_1fr_auto] gap-2 mb-2 targetRow';div.innerHTML=`<select class="input targetType"><option value="ALL">Toàn công ty</option><option value="DEPARTMENT">Bộ phận</option><option value="FACTORY">Xưởng</option><option value="EMPLOYEE">Nhân viên</option></select><input class="input targetValue" placeholder="Giá trị (bỏ trống nếu toàn công ty)"><button class="btn btn-light" onclick="this.parentElement.remove()">✕</button>`;div.querySelector('.targetType').value=t.type||'ALL';div.querySelector('.targetValue').value=t.value==='ALL'?'':(t.value||'');$('targetRows').appendChild(div)}
+$('attachmentFiles').addEventListener('change',()=>{$('pendingFiles').textContent=[...$('attachmentFiles').files].map(f=>f.name).join(', ')})
+async function saveAnnouncement(){const data={id:$('editId').value,title:$('editTitle').value,content:$('editContent').value,type:$('editType').value,priority:$('editPriority').value,publishDate:$('editPublish').value,scheduledAt:$('editScheduled').value,keywords:$('editKeywords').value,targets:[...document.querySelectorAll('.targetRow')].map(r=>({type:r.querySelector('.targetType').value,value:r.querySelector('.targetValue').value||'ALL'}))};try{const r=await call('SAVE_ANNOUNCEMENT',data);if(r.status!=='SUCCESS')return toast(r.message,'error');for(const f of $('attachmentFiles').files){const b=await fileBase64(f);const u=await call('UPLOAD_ATTACHMENT',{announcementId:r.id,fileName:f.name,mimeType:f.type,base64:b});if(u.status!=='SUCCESS')throw new Error(u.message)}toast(r.message);closeModal('editorModal');loadAdminAnnouncements();loadFilters();loadAnnouncements()}catch(e){toast(e.message,'error')}}
+function fileBase64(file){return new Promise((res,rej)=>{const rd=new FileReader();rd.onload=()=>res(String(rd.result).split(',')[1]);rd.onerror=rej;rd.readAsDataURL(file)})}
+async function loadAdminAnnouncements(){try{const r=await call('GET_ADMIN_ANNOUNCEMENTS',{q:$('adminSearch')?.value||''});$('adminStats').innerHTML=[['Tổng',r.stats.total],['Published',r.stats.published],['Hẹn giờ',r.stats.scheduled]].map(x=>`<div class="card p-4"><div class="text-xs text-slate-400">${x[0]}</div><div class="text-2xl font-black">${x[1]}</div></div>`).join('');$('adminTable').innerHTML=(r.items||[]).map(a=>`<tr class="border-t"><td class="p-3">${fmtDate(a.publishDate)}</td><td class="p-3 font-bold">${a.pinned?'📌 ':''}${esc(a.title)}</td><td class="p-3 text-center">${esc(a.type)}</td><td class="p-3 text-center">${esc(a.author)}</td><td class="p-3 text-center">${esc(a.status)}</td><td class="p-3"><div class="flex gap-1 flex-wrap"><button class="btn btn-light text-xs" onclick='editById(${JSON.stringify(a.id)})'>✏️</button><button class="btn btn-light text-xs" onclick='viewAdmin(${JSON.stringify(a.id)})'>👁</button><button class="btn btn-light text-xs" onclick='pinAdmin(${JSON.stringify(a.id)})'>📌</button><button class="btn btn-light text-xs" onclick='deleteAdmin(${JSON.stringify(a.id)})'>🗑️</button></div></td></tr>`).join('')}catch(e){toast(e.message,'error')}}
+async function editById(id){const r=await call('GET_ANNOUNCEMENT',{id});if(r.status==='SUCCESS')openEditor(r.item)}
+async function viewAdmin(id){openDetail(id)}
+async function pinAdmin(id){try{const r=await call('TOGGLE_PIN',{id});toast(r.message||'Đã cập nhật');loadAdminAnnouncements();loadAnnouncements()}catch(e){toast(e.message,'error')}}
+async function deleteAdmin(id){if(!confirm('Xóa thông báo này? Dữ liệu đọc vẫn được giữ lại.'))return;try{const r=await call('DELETE_ANNOUNCEMENT',{id});toast(r.message);loadAdminAnnouncements();loadAnnouncements()}catch(e){toast(e.message,'error')}}
+async function loadEmployees(){try{const r=await call('GET_EMPLOYEES',{q:$('empSearch').value});$('employeeTable').innerHTML=`<table class="w-full text-sm min-w-[800px]"><thead class="bg-slate-50"><tr><th class="p-2 text-left">Mã</th><th class="p-2 text-left">Họ tên</th><th class="p-2">Bộ phận</th><th class="p-2">Xưởng</th><th class="p-2">Chức vụ</th><th class="p-2">Trạng thái</th></tr></thead><tbody>${(r.items||[]).slice(0,1000).map(e=>`<tr class="border-t"><td class="p-2 font-bold">${esc(e.employeeCode||e.employeeId)}</td><td class="p-2">${esc(e.name)}</td><td class="p-2">${esc(e.department)}</td><td class="p-2">${esc(e.factory)}</td><td class="p-2">${esc(e.position)}</td><td class="p-2">${esc(e.status)}</td></tr>`).join('')}</tbody></table>`}catch(e){toast(e.message,'error')}}
+async function readExcel(file){if(!file)return;try{const buf=await file.arrayBuffer();const wb=XLSX.read(buf,{type:'array',cellDates:true});const ws=wb.Sheets[wb.SheetNames[0]];const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});const r=await call('IMPORT_PREVIEW',{fileName:file.name,rows});if(r.status!=='SUCCESS')return toast(r.message,'error');pendingImport={fileName:file.name,rows};$('importBox').innerHTML=`<div class="flex justify-between items-center"><div><h3 class="font-black">Xem trước Import</h3><p class="text-sm text-slate-500">${esc(file.name)}</p></div><button class="btn btn-light" onclick="hide('importBox')">✕</button></div><div class="grid grid-cols-2 md:grid-cols-5 gap-2 mt-4">${[['Tổng',r.summary.total],['Mới',r.summary.added],['Cập nhật',r.summary.updated],['Không đổi',r.summary.unchanged],['Lỗi',r.summary.errors]].map(x=>`<div class="bg-slate-50 rounded-xl p-3 text-center"><div class="text-xl font-black">${x[1]}</div><div class="text-xs text-slate-500">${x[0]}</div></div>`).join('')}</div><div class="mt-4"><label class="font-bold text-sm">Nhân viên không có trong Excel mới</label><div class="flex gap-5 mt-2"><label><input type="radio" name="missingPolicy" value="NO_CHANGE" checked> Không thay đổi</label><label><input type="radio" name="missingPolicy" value="INACTIVE"> Đánh dấu INACTIVE</label></div></div><div class="mt-4 flex justify-end"><button class="btn btn-primary" onclick="confirmImport()">✓ Xác nhận Import</button></div>`;show('importBox')}catch(e){toast(e.message,'error')}}
+async function confirmImport(){if(!pendingImport)return;const policy=document.querySelector('input[name=missingPolicy]:checked').value;if(!confirm('Xác nhận ghi dữ liệu vào Google Sheets?'))return;try{const r=await call('IMPORT_CONFIRM',{...pendingImport,missingPolicy:policy});toast(`Import xong: mới ${r.summary.added}, cập nhật ${r.summary.updated}, inactive ${r.summary.inactive}`);pendingImport=null;hide('importBox');$('excelFile').value='';loadEmployees();loadImportHistory();loadFilters()}catch(e){toast(e.message,'error')}}
+async function loadImportHistory(){try{const r=await call('GET_IMPORT_HISTORY');$('importHistory').innerHTML=`<div class="overflow-auto"><table class="w-full text-sm min-w-[800px]"><thead><tr><th class="p-2 text-left">Thời gian</th><th class="p-2 text-left">File</th><th class="p-2">Người import</th><th class="p-2">Tổng</th><th class="p-2">Mới</th><th class="p-2">Cập nhật</th><th class="p-2">Inactive</th></tr></thead><tbody>${(r.items||[]).map(x=>`<tr class="border-t"><td class="p-2">${fmtDate(x.importedAt)}</td><td class="p-2">${esc(x.fileName)}</td><td class="p-2">${esc(x.importedBy)}</td><td class="p-2 text-center">${x.total}</td><td class="p-2 text-center">${x.added}</td><td class="p-2 text-center">${x.updated}</td><td class="p-2 text-center">${x.inactive}</td></tr>`).join('')}</tbody></table></div>`}catch(e){}}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal('detailModal');closeModal('editorModal');closeModal('statsModal')}});
+boot();
+</script>
+</body>
+</html>
