@@ -1,0 +1,502 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cổng Thông Báo Nội Bộ - Liwayway Việt Nam</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Inter,system-ui,-apple-system,sans-serif;background:#f5f7fb;color:#172033;line-height:1.5}
+.hidden{display:none!important}
+
+/* External Links Bar */
+.external-nav{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;padding:12px;background:#fff;border-bottom:1px solid #e8ecf2}
+.ext-link{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:20px;background:#f8fafc;color:#334155;font-weight:600;font-size:13px;text-decoration:none;border:1px solid #e2e8f0;transition:all .2s}
+.ext-link:hover{background:#edf2ff;color:#2563eb;border-color:#bfdbfe;transform:translateY(-1px)}
+.ext-link.active{background:linear-gradient(135deg,#2563eb,#1e40af);color:#fff;border:none}
+
+/* Auth Section */
+.login{min-height:calc(100vh - 60px);display:grid;place-items:center;padding:20px;background:linear-gradient(135deg,#edf2ff,#f8fafc)}
+.login-card{width:min(430px,100%);background:#fff;padding:34px;border-radius:22px;box-shadow:0 20px 60px rgba(23,32,51,.1)}
+.brand{font-weight:800;color:#2457d6;letter-spacing:.5px}
+.login h1{font-size:22px;margin:12px 0 5px}
+.muted{color:#667085;font-size:14px}
+label{display:block;font-weight:600;margin:15px 0 6px;font-size:14px}
+input,select,textarea{font:inherit;width:100%;padding:11px 14px;border:1px solid #d7deea;border-radius:10px;background:#fff;outline:none;transition:border-color .2s}
+input:focus,select:focus,textarea:focus{border-color:#2457d6}
+textarea{min-height:160px;resize:vertical}
+.btn{border:1px solid #d7deea;background:#fff;border-radius:9px;padding:9px 14px;cursor:pointer;font-weight:600;transition:.2s}
+.btn:hover{background:#f7f8fa}
+.primary{border:0;background:#2457d6;color:#fff;border-radius:10px;padding:12px 16px;font-weight:700;cursor:pointer;transition:background .2s}
+.primary:hover{background:#1e40af}
+.full{width:100%;margin-top:20px}
+.error{color:#b42318;min-height:20px;font-size:14px;margin-top:8px}
+
+/* App Header & Navigation */
+.top{height:64px;background:#fff;border-bottom:1px solid #e8ecf2;display:flex;align-items:center;justify-content:space-between;padding:0 24px;position:sticky;top:0;z-index:10}
+.user{display:flex;align-items:center;gap:10px}
+.nav{display:flex;gap:6px;padding:8px 24px;background:#fff;border-bottom:1px solid #e8ecf2;position:sticky;top:64px;z-index:9;overflow-x:auto}
+.nav button{border:0;background:transparent;padding:9px 14px;border-radius:8px;white-space:nowrap;cursor:pointer;font-weight:600;color:#475569}
+.nav button.active,.nav button:hover{background:#edf2ff;color:#2457d6}
+
+/* Layout Content */
+.wrap{max-width:1200px;margin:auto;padding:24px 16px}
+.hero{display:flex;justify-content:space-between;gap:15px;align-items:center;margin-bottom:20px}
+.stats{display:flex;gap:12px;flex-wrap:wrap}
+.stat{background:#fff;border:1px solid #e7ebf2;border-radius:12px;padding:14px 18px;min-width:130px}
+.stat b{font-size:22px;display:block;margin-top:2px;color:#2457d6}
+.filters{background:#fff;border:1px solid #e7ebf2;border-radius:14px;padding:15px;display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto;gap:10px;margin-bottom:16px}
+.cards{display:grid;gap:12px}
+.card{background:#fff;border:1px solid #e5e9f0;border-radius:14px;padding:18px;cursor:pointer;transition:box-shadow .2s,transform .2s}
+.card:hover{box-shadow:0 8px 24px rgba(23,32,51,.08);transform:translateY(-1px)}
+.card.unread{border-left:4px solid #e53935}
+.head{display:flex;justify-content:space-between;align-items:center}
+.badge{display:inline-block;border-radius:20px;padding:4px 10px;font-size:12px;font-weight:600;background:#edf2ff;color:#315bc9}
+.badge.red{background:#fff0f0;color:#b42318}
+.title{font-size:17px;font-weight:700;margin:8px 0 4px}
+.meta{font-size:12px;color:#667085}
+.content{white-space:pre-wrap;line-height:1.6}
+
+/* Modals & Tables */
+.modal{position:fixed;inset:0;background:rgba(16,24,40,.6);z-index:50;display:grid;place-items:center;padding:20px}
+.modalbox{background:#fff;border-radius:16px;width:min(850px,100%);max-height:90vh;overflow-y:auto;padding:24px}
+.modalhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.close{border:0;background:none;font-size:24px;cursor:pointer;color:#667085}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.tablebox{background:#fff;border:1px solid #e5e9f0;border-radius:12px;overflow-x:auto}
+.table{width:100%;border-collapse:collapse;font-size:14px}
+.table th,.table td{padding:12px;border-bottom:1px solid #edf0f4;text-align:left;white-space:nowrap}
+.actions{display:flex;gap:6px}
+.drop{border:2px dashed #cbd5e1;border-radius:12px;padding:20px;text-align:center;margin-top:12px;background:#f8fafc}
+.attachment{background:#f8fafc;border-radius:12px;padding:14px;margin-top:16px;border:1px solid #e2e8f0}
+.attachment iframe{width:100%;height:480px;border:0;margin-top:10px;border-radius:8px}
+.target{display:flex;gap:8px;margin:8px 0}
+
+/* Loaders & Links */
+.detail-link{display:inline-flex;align-items:center;gap:4px;margin-top:12px;color:#2457d6;font-weight:700;font-size:13px}
+.loading-overlay{position:fixed;inset:0;background:rgba(16,24,40,.4);z-index:100;display:grid;place-items:center}
+.loading-box{background:#fff;border-radius:14px;padding:18px 24px;box-shadow:0 20px 40px rgba(0,0,0,.15);display:flex;align-items:center;gap:12px;font-weight:600}
+.spinner{width:22px;height:22px;border:3px solid #dbe3f2;border-top-color:#2457d6;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+@media(max-width:768px){
+    .filters{grid-template-columns:1fr}
+    .grid2{grid-template-columns:1fr}
+    .hero{flex-direction:column;align-items:flex-start}
+    .user #who{display:none}
+}
+</style>
+</head>
+<body>
+
+ <nav class="external-nav">
+     <a href="#" class="ext-link active">📢 Thông báo</a>
+     <a href="https://bangchamcong.pages.dev" target="_blank" rel="noopener" class="ext-link">📋 Chấm Công</a>
+     <a href="https://phepnam.pages.dev" target="_blank" rel="noopener" class="ext-link">📅 Phép năm</a>
+     <a href="https://noiquy.pages.dev" target="_blank" rel="noopener" class="ext-link">📜 Lỗi cơm</a>
+     <a href="https://phucap.pages.dev" target="_blank" rel="noopener" class="ext-link">🥛 Phụ cấp sữa</a>
+     <a href="https://noikhambenh.pages.dev" target="_blank" rel="noopener" class="ext-link">🏥 BHXH</a>
+     <a href="https://antoan.pages.dev" target="_blank" rel="noopener" class="ext-link">🛡️ An Toàn</a>
+     <a href="https://xnc-immigration.pages.dev" target="_blank" rel="noopener" class="ext-link">🛂 Immigration</a>
+ </nav>
+
+ <section id="login" class="login">
+  <div class="login-card">
+   <div class="brand">🏭 CÔNG TY CP LIWAYWAY VIỆT NAM</div>
+   <h1>THÔNG BÁO NỘI BỘ</h1>
+   <p class="muted">Đăng nhập để xem thông báo dành cho bạn.</p>
+   <label for="employeeId">Mã Số Nhân Viên / Số Căn Cước</label>
+   <input id="employeeId" placeholder="Ví dụ: 5420" autocomplete="username">
+   <label for="password">Mật khẩu</label>
+   <input id="password" type="password" placeholder="••••••••" autocomplete="current-password">
+   <button class="primary full" id="loginBtn">ĐĂNG NHẬP</button>
+   <div id="loginError" class="error"></div>
+  </div>
+ </section>
+
+ <section id="app" class="hidden">
+  <header class="top">
+   <div class="brand">🏭 LIWAYWAY <span style="font-weight:500;color:#475569">| THÔNG BÁO</span></div>
+   <div class="user">
+    <span id="who"></span>
+    <button class="btn" id="pwdBtn" title="Đổi mật khẩu">🔑</button>
+    <button class="btn" id="logoutBtn">Đăng xuất</button>
+   </div>
+  </header>
+
+  <nav class="nav">
+   <button data-page="home" class="active">🏠 Trang chủ</button>
+   <button data-page="notices">📢 Thông báo</button>
+   <button data-page="important">📌 Quan trọng</button>
+   <button data-page="profile">👤 Cá nhân</button>
+   <button id="adminNav" class="hidden" data-page="admin">⚙️ Quản trị</button>
+  </nav>
+
+  <main class="wrap">
+   <div id="home"></div>
+   <div id="notices" class="hidden"></div>
+   <div id="important" class="hidden"></div>
+   <div id="profile" class="hidden"></div>
+   <div id="admin" class="hidden"></div>
+  </main>
+ </section>
+
+ <div id="modal" class="modal hidden"></div>
+ <div id="loading" class="loading-overlay hidden" aria-live="polite">
+  <div class="loading-box"><span class="spinner"></span><span id="loadingText">Đang xử lý...</span></div>
+ </div>
+
+<script>
+/* CONFIGURATION */
+const API_URL = 'https://script.google.com/macros/s/AKfycbz9RJAgZlJB8wRlKDtaSTCVXmlUXZU1CZZT1CCduqGIIF3MZmGc5YKSx05Zy75co-VE/exec';
+
+const state = { token: '', user: null, dashboard: null, filters: {} };
+const TYPES = ['📢 Thông báo chung','🕐 Thời gian làm việc','💰 Lương & thưởng','🎁 Phúc lợi','🏥 Sức khỏe','🦺 An toàn / HSE','🏭 Sản xuất','📋 Nhân sự','🎉 Hoạt động công ty','⚠️ Khẩn cấp'];
+
+const $ = id => document.getElementById(id);
+function esc(x){ return String(x??'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])) }
+function attr(x){ return esc(x) }
+function toast(m){ alert(m) }
+function fmt(x){ if(!x) return ''; const d = new Date(x); return isNaN(d) ? String(x) : d.toLocaleString('vi-VN', {dateStyle:'short', timeStyle:'short'}) }
+function htmlContent(x){ return esc(x).replace(/\n/g,'<br>') }
+
+function setLoading(on, text = 'Đang xử lý...'){
+  $('loadingText').textContent = text;
+  $('loading').classList.toggle('hidden', !on);
+  document.body.style.overflow = on ? 'hidden' : '';
+}
+
+async function withLoading(text, fn){
+  setLoading(true, text);
+  try { return await fn(); } finally { setLoading(false); }
+}
+
+async function api(action, data = {}){
+  if(!API_URL || API_URL.includes('PASTE_YOUR')) throw new Error('Vui lòng cấu hình API_URL Apps Script.');
+  const res = await fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ action, ...data })
+  });
+  const text = await res.text();
+  let j;
+  try { j = JSON.parse(text); } catch(e) {
+    throw new Error(text.includes('<html') ? 'Google Apps Script trả về lỗi HTML. Kiểm tra lại bản Deploy.' : 'Lỗi phản hồi dữ liệu.');
+  }
+  if(!j.ok) throw new Error(j.error || 'Thao tác không thành công.');
+  return j;
+}
+
+function boot(){
+  localStorage.removeItem('notice_token');
+  sessionStorage.removeItem('notice_token');
+  state.token = '';
+  showLogin();
+}
+
+function showLogin(){ $('login').classList.remove('hidden'); $('app').classList.add('hidden'); }
+
+function enter(){
+  $('login').classList.add('hidden');
+  $('app').classList.remove('hidden');
+  $('who').textContent = `Xin chào, ${state.user.fullName}`;
+  if(['ADMIN','HR'].includes(state.user.role)) $('adminNav').classList.remove('hidden');
+  load();
+}
+
+async function login(){
+  $('loginError').textContent = '';
+  const employeeId = $('employeeId').value.trim();
+  const password = $('password').value;
+  if(!employeeId || !password){ $('loginError').textContent = 'Vui lòng nhập đầy đủ thông tin.'; return; }
+  
+  await withLoading('Đang đăng nhập...', async () => {
+    try {
+      const r = await api('login', { employeeId, password, userAgent: navigator.userAgent });
+      state.token = r.token;
+      state.user = r.user;
+      $('employeeId').value = ''; $('password').value = '';
+      enter();
+    } catch(e) { $('loginError').textContent = e.message; }
+  });
+}
+
+async function logout(){
+  try { await api('logout', { token: state.token }); } catch(e){}
+  state.token = ''; state.user = null;
+  showLogin();
+}
+
+async function load(){
+  try {
+    state.dashboard = await api('dashboard', { token: state.token, filters: state.filters });
+    renderHome();
+    renderNotices();
+  } catch(e) {
+    if(e.message.includes('hết hạn')) logout();
+    else toast(e.message);
+  }
+}
+
+function nav(page){
+  ['home','notices','important','profile','admin'].forEach(x => $(x).classList.add('hidden'));
+  $(page).classList.remove('hidden');
+  document.querySelectorAll('.nav button').forEach(b => b.classList.toggle('active', b.dataset.page === page));
+  if(page === 'profile') renderProfile();
+  if(page === 'admin') renderAdmin();
+}
+
+function card(a){
+  return `<div class="card ${a.unread ? 'unread' : ''}" onclick="openNotice('${attr(a.id)}')">
+    <div class="head"><span class="badge">${esc(a.type)}</span><span>${a.pinned ? '📌' : ''}</span></div>
+    <div class="title">${esc(a.title)}</div>
+    <div class="meta">${fmt(a.publishDate)} · ${esc(a.author || '')}</div>
+    <div style="margin-top:8px">${htmlContent(String(a.content || '').replace(/<[^>]*>/g, ' ').slice(0, 200))}${String(a.content || '').length > 200 ? '…' : ''}</div>
+    <div style="margin-top:10px">${a.unread ? '<span class="badge red">🔴 Chưa đọc</span>' : '<span class="badge">✓ Đã đọc</span>'}</div>
+    <div class="detail-link">Xem chi tiết →</div>
+  </div>`;
+}
+
+function renderHome(){
+  const d = state.dashboard;
+  $('home').innerHTML = `<div class="hero">
+    <div><h2>Xin chào ${esc(state.user.fullName)} 👋</h2><div class="muted">Thông báo mới nhất dành cho bộ phận ${esc(state.user.department || 'bạn')}.</div></div>
+    <div class="stat">Chưa đọc<b>${d.unreadCount}</b></div>
+  </div>
+  <div class="cards">${d.announcements.slice(0,6).map(card).join('') || '<div class="card">Không có thông báo mới.</div>'}</div>`;
+}
+
+function renderNotices(){
+  const d = state.dashboard, f = state.filters;
+  $('notices').innerHTML = `<div class="hero"><div><h2>📢 Tất cả thông báo</h2></div></div>
+  <div class="filters">
+    <input id="search" placeholder="🔎 Tìm kiếm..." value="${attr(f.search || '')}">
+    <select id="month"><option value="">📅 Tất cả tháng</option>${d.months.map(x=>`<option value="${attr(x.month)}" ${f.month===x.month?'selected':''}>Tháng ${x.month} (${x.count})</option>`).join('')}</select>
+    <select id="type"><option value="">🏷️ Loại tin</option>${TYPES.map(x=>`<option value="${attr(x)}" ${f.type===x?'selected':''}>${esc(x)}</option>`).join('')}</select>
+    <select id="department"><option value="">📍 Bộ phận</option>${d.departments.map(x=>`<option ${f.department===x?'selected':''}>${esc(x)}</option>`).join('')}</select>
+    <button class="primary" onclick="applyFilters()">Lọc</button>
+  </div>
+  <label style="margin-bottom:15px;display:inline-block"><input id="unread" type="checkbox" ${f.unreadOnly?'checked':''}> 🔴 Chỉ hiển thị chưa đọc</label>
+  <div class="cards">${d.announcements.map(card).join('') || '<div class="card">Không có thông báo phù hợp.</div>'}</div>`;
+}
+
+function applyFilters(){
+  state.filters = { search: $('search').value, month: $('month').value, type: $('type').value, department: $('department').value, unreadOnly: $('unread').checked };
+  load();
+}
+
+async function important(){
+  try {
+    await withLoading('Tải dữ liệu...', async () => {
+      const r = await api('important', { token: state.token });
+      $('important').innerHTML = `<div class="hero"><div><h2>📌 Thông báo quan trọng</h2></div></div>
+      <div class="cards">${(r.announcements || []).map(card).join('') || '<div class="card">Không có thông báo quan trọng.</div>'}</div>`;
+      nav('important');
+    });
+  } catch(e) { toast(e.message); }
+}
+
+async function openNotice(id){
+  try {
+    const r = await api('announcement', { token: state.token, id });
+    const a = r.announcement, att = r.attachment;
+    $('modal').classList.remove('hidden');
+    $('modal').innerHTML = `<div class="modalbox">
+      <div class="modalhead"><h2>${esc(a.title)}</h2><button class="close" onclick="closeModal()">×</button></div>
+      <div class="meta">${fmt(a.publishDate)} · ${esc(a.type)} · ${esc(a.author || '')}</div><hr style="border:0;border-top:1px solid #edf0f4;margin:12px 0">
+      <div class="content">${htmlContent(a.content)}</div>
+      ${att ? attachment(att) : ''}
+    </div>`;
+    await load();
+  } catch(e) { toast(e.message); }
+}
+
+function attachment(a){
+  const url = a.previewUrl || a.url || '';
+  if(!url) return '';
+  return `<div class="attachment"><b>📎 Tệp đính kèm: ${esc(a.name || 'File')}</b><p><a href="${attr(url)}" target="_blank" rel="noopener">Tải xuống / Mở trong cửa sổ mới</a></p><iframe src="${attr(url)}"></iframe></div>`;
+}
+
+function closeModal(){ $('modal').classList.add('hidden'); $('modal').innerHTML = ''; }
+
+function renderProfile(){
+  $('profile').innerHTML = `<div class="card">
+    <h2>👤 Thông tin tài khoản</h2>
+    <p><b>Mã nhân viên:</b> ${esc(state.user.employeeId)}</p>
+    <p><b>Họ và tên:</b> ${esc(state.user.fullName)}</p>
+    <p><b>Bộ phận:</b> ${esc(state.user.department || 'N/A')}</p>
+    <button class="primary" onclick="passwordModal()">🔑 Đổi mật khẩu</button>
+  </div>`;
+}
+
+function passwordModal(){
+  $('modal').classList.remove('hidden');
+  $('modal').innerHTML = `<div class="modalbox" style="max-width:400px">
+    <div class="modalhead"><h2>Đổi mật khẩu</h2><button class="close" onclick="closeModal()">×</button></div>
+    <label>Mật khẩu hiện tại</label><input id="oldpw" type="password">
+    <label>Mật khẩu mới</label><input id="newpw" type="password">
+    <label>Xác nhận mật khẩu mới</label><input id="newpw2" type="password">
+    <button class="primary full" onclick="changePw()">Lưu thay đổi</button>
+  </div>`;
+}
+
+async function changePw(){
+  if($('newpw').value !== $('newpw2').value){ toast('Mật khẩu nhập lại không khớp'); return; }
+  try {
+    await api('changePassword', { token: state.token, oldPassword: $('oldpw').value, newPassword: $('newpw').value });
+    toast('Cập nhật mật khẩu thành công!');
+    closeModal();
+  } catch(e) { toast(e.message); }
+}
+
+/* ADMIN PANEL FUNCTIONALITIES */
+async function renderAdmin(){
+  if(!['ADMIN','HR'].includes(state.user.role)) return;
+  try {
+    const r = await api('adminDashboard', { token: state.token });
+    $('admin').innerHTML = `<div class="hero">
+      <h2>⚙️ QUẢN LÝ THÔNG BÁO</h2>
+      <div class="actions">
+        <button class="btn" onclick="importModal()">📥 Import Excel</button>
+        <button class="primary" onclick="announcementModal()">＋ Tạo bài viết</button>
+      </div>
+    </div>
+    <div class="stats">
+      <div class="stat">Nhân viên<b>${r.stats.employees}</b></div>
+      <div class="stat">Bài viết<b>${r.stats.announcements}</b></div>
+      <div class="stat">Đã đăng<b>${r.stats.published}</b></div>
+      <div class="stat">Lượt đọc<b>${r.stats.totalReads}</b></div>
+    </div>
+    <div style="height:15px"></div>
+    <div class="tablebox">
+      <table class="table">
+        <thead><tr><th>Ngày</th><th>Tiêu đề</th><th>Loại</th><th>Tác giả</th><th>Thao tác</th></tr></thead>
+        <tbody>
+          ${r.announcements.map(a => `<tr>
+            <td>${fmt(a.publishDate)}</td>
+            <td>${a.pinned ? '📌 ' : ''}${esc(a.title)}</td>
+            <td>${esc(a.type)}</td>
+            <td>${esc(a.author)}</td>
+            <td><div class="actions">
+              <button class="btn" onclick="openNotice('${attr(a.id)}')">👁️</button>
+              <button class="btn" onclick="editAnnouncement('${attr(a.id)}')">✏️</button>
+              <button class="btn" onclick="pin('${attr(a.id)}')">📌</button>
+              <button class="btn" onclick="delAnn('${attr(a.id)}')">🗑️</button>
+            </div></td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+  } catch(e) { toast(e.message); }
+}
+
+function announcementModal(existing = null){
+  const a = existing || {};
+  $('modal').classList.remove('hidden');
+  $('modal').innerHTML = `<div class="modalbox">
+    <div class="modalhead"><h2>${a.id ? '✏️ Chỉnh sửa' : '＋ Tạo mới'} thông báo</h2><button class="close" onclick="closeModal()">×</button></div>
+    <input id="aid" type="hidden" value="${attr(a.id || '')}">
+    <label>Tiêu đề</label><input id="atitle" value="${attr(a.title || '')}">
+    <label>Nội dung</label><textarea id="acontent">${esc(a.content || '')}</textarea>
+    <div class="grid2">
+      <div><label>Phân loại</label><select id="atype">${TYPES.map(x=>`<option ${a.type===x?'selected':''}>${esc(x)}</option>`).join('')}</select></div>
+      <div><label>Độ ưu tiên</label><select id="apriority"><option>NORMAL</option><option ${a.priority==='HIGH'?'selected':''}>HIGH</option><option ${a.priority==='URGENT'?'selected':''}>URGENT</option></select></div>
+    </div>
+    <div style="margin:12px 0"><label><input id="apinned" type="checkbox" ${a.pinned?'checked':''}> 📌 Ghim lên đầu trang</label></div>
+    <button class="primary full" onclick="saveAnnouncement()">LƯU BÀI VIẾT</button>
+  </div>`;
+}
+
+async function saveAnnouncement(){
+  await withLoading('Đang lưu bài viết...', async () => {
+    try {
+      await api('saveAnnouncement', { token: state.token, data: {
+        id: $('aid').value, title: $('atitle').value, content: $('acontent').value,
+        type: $('atype').value, priority: $('apriority').value, pinned: $('apinned').checked
+      }});
+      closeModal(); renderAdmin(); toast('Đã lưu thành công');
+    } catch(e) { toast(e.message); }
+  });
+}
+
+async function editAnnouncement(id){
+  try {
+    const r = await api('adminDashboard', { token: state.token });
+    const a = r.announcements.find(x => x.id === id);
+    if(a) announcementModal(a);
+  } catch(e) { toast(e.message); }
+}
+
+async function pin(id){ try{ await api('togglePinned', { token: state.token, id }); renderAdmin(); }catch(e){ toast(e.message); } }
+async function delAnn(id){ if(confirm('Bạn chắc chắn muốn xóa?')){ try{ await api('deleteAnnouncement', { token: state.token, id }); renderAdmin(); }catch(e){ toast(e.message); } } }
+
+/* EXCEL IMPORT FUNCTIONALITY */
+let importRows = [];
+async function loadXLSX(){
+  if(window.XLSX) return;
+  await new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';
+    s.onload = resolve; s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+
+function importModal(){
+  $('modal').classList.remove('hidden');
+  $('modal').innerHTML = `<div class="modalbox">
+    <div class="modalhead"><h2>📥 Import danh sách Nhân viên</h2><button class="close" onclick="closeModal()">×</button></div>
+    <div class="drop"><input id="excel" type="file" accept=".xlsx, .xls, .csv"></div>
+    <div id="preview" style="margin-top:15px"></div>
+    <button class="primary full" onclick="previewImport()">Xem trước</button>
+    <button id="commit" class="primary full hidden" style="background:#16a34a" onclick="commitImport()">Xác nhận Import</button>
+  </div>`;
+}
+
+async function previewImport(){
+  await withLoading('Đang đọc tập tin Excel...', async () => {
+    try {
+      await loadXLSX();
+      const f = $('excel').files[0];
+      if(!f) throw new Error('Vui lòng chọn file Excel.');
+      const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      importRows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+      
+      const r = await api('previewImport', { token: state.token, rows: importRows });
+      $('preview').innerHTML = `<div class="stat">Tìm thấy <b>${r.total}</b> dòng hợp lệ.</div>`;
+      $('commit').classList.remove('hidden');
+    } catch(e) { toast(e.message); }
+  });
+}
+
+async function commitImport(){
+  if(!confirm('Cập nhật thông tin vào hệ thống?')) return;
+  await withLoading('Đang đồng bộ dữ liệu...', async () => {
+    try {
+      const r = await api('commitImport', { token: state.token, rows: importRows, missingAction: 'NO_CHANGE' });
+      toast(`Hoàn tất! Thêm mới: ${r.added}, Cập nhật: ${r.updated}`);
+      closeModal();
+    } catch(e) { toast(e.message); }
+  });
+}
+
+/* EVENT BINDINGS */
+$('loginBtn').onclick = login;
+$('password').addEventListener('keydown', e => { if(e.key === 'Enter') login(); });
+$('logoutBtn').onclick = logout;
+$('pwdBtn').onclick = passwordModal;
+
+document.querySelectorAll('.nav button').forEach(b => {
+  b.onclick = () => {
+    const page = b.dataset.page;
+    if(page === 'important') important();
+    else nav(page);
+  };
+});
+
+// Khởi chạy ứng dụng
+boot();
+</script>
+</body>
+</html>
