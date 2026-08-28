@@ -1,0 +1,892 @@
+<script>
+
+/* =====================================================
+ * API WRAPPER
+ * ===================================================== */
+
+const API = {
+
+  call(functionName, ...args) {
+
+    return new Promise(
+      (resolve, reject) => {
+
+        google.script.run
+
+          .withSuccessHandler(
+            result => {
+
+              if (
+                result &&
+                result.success === false
+              ) {
+                reject(
+                  new Error(
+                    result.message ||
+                    'Có lỗi xảy ra.'
+                  )
+                );
+              } else {
+                resolve(result);
+              }
+
+            }
+          )
+
+          .withFailureHandler(
+            error => {
+
+              reject(
+                new Error(
+                  error.message ||
+                  'Không thể kết nối máy chủ.'
+                )
+              );
+
+            }
+          )
+
+          [functionName](
+            ...args
+          );
+      }
+    );
+  },
+
+
+  login(id, password) {
+
+    return this.call(
+      'login',
+      id,
+      password
+    );
+  },
+
+
+  logout(token) {
+
+    return this.call(
+      'logout',
+      token
+    );
+  },
+
+
+  currentUser(token) {
+
+    return this.call(
+      'getCurrentUser',
+      token
+    );
+  },
+
+
+  dashboard(token) {
+
+    return this.call(
+      'getDashboard',
+      token
+    );
+  },
+
+
+  announcements(
+    token,
+    filters
+  ) {
+
+    return this.call(
+      'getAnnouncements',
+      token,
+      filters
+    );
+  },
+
+
+  detail(
+    token,
+    id
+  ) {
+
+    return this.call(
+      'getAnnouncementDetail',
+      token,
+      id
+    );
+  },
+
+
+  adminAnnouncements(
+    token
+  ) {
+
+    return this.call(
+      'adminGetAnnouncements',
+      token
+    );
+  },
+
+
+  adminDashboard(
+    token
+  ) {
+
+    return this.call(
+      'getAdminDashboard',
+      token
+    );
+  },
+
+
+  createAnnouncement(
+    token,
+    data
+  ) {
+
+    return this.call(
+      'createAnnouncement',
+      token,
+      data
+    );
+  },
+
+
+  uploadAttachment(
+    token,
+    file
+  ) {
+
+    return this.call(
+      'uploadAttachment',
+      token,
+      file
+    );
+  },
+
+
+  pin(
+    token,
+    id
+  ) {
+
+    return this.call(
+      'toggleAnnouncementPin',
+      token,
+      id
+    );
+  },
+
+
+  deleteAnnouncement(
+    token,
+    id
+  ) {
+
+    return this.call(
+      'deleteAnnouncement',
+      token,
+      id
+    );
+  },
+
+
+  importPreview(
+    token,
+    rows,
+    fileName
+  ) {
+
+    return this.call(
+      'previewEmployeeImport',
+      token,
+      rows,
+      fileName
+    );
+  },
+
+
+  importConfirm(
+    token,
+    payload
+  ) {
+
+    return this.call(
+      'confirmEmployeeImport',
+      token,
+      payload
+    );
+  }
+
+};
+
+
+/* =====================================================
+ * HELPERS
+ * ===================================================== */
+
+function escapeHtml(value) {
+
+  return String(
+    value === undefined ||
+    value === null
+      ? ''
+      : value
+  )
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#039;');
+}
+
+
+function escapeAttr(value) {
+
+  return escapeHtml(value);
+}
+
+
+function stripHtml(value) {
+
+  const div =
+    document.createElement(
+      'div'
+    );
+
+  div.innerHTML =
+    String(value || '');
+
+  return div.textContent ||
+    div.innerText ||
+    '';
+}
+
+
+function safeHtml(value) {
+
+  /*
+   * Content do HR tạo.
+   *
+   * Với hệ thống internet-facing,
+   * nên dùng DOMPurify hoặc sanitization
+   * server-side trước khi cho phép HTML.
+   *
+   * Bản mặc định chuyển line break
+   * thành <br>.
+   */
+
+  return escapeHtml(
+    value || ''
+  )
+  .replace(
+    /\n/g,
+    '<br>'
+  );
+}
+
+
+function typeOptions(
+  selected
+) {
+
+  const types = {
+
+    GENERAL:
+      ['📢', 'Thông báo chung'],
+
+    WORK_TIME:
+      ['🕐', 'Thời gian làm việc'],
+
+    SALARY:
+      ['💰', 'Lương & thưởng'],
+
+    BENEFIT:
+      ['🎁', 'Phúc lợi'],
+
+    HEALTH:
+      ['🏥', 'Sức khỏe'],
+
+    HSE:
+      ['🦺', 'An toàn / HSE'],
+
+    PRODUCTION:
+      ['🏭', 'Sản xuất'],
+
+    HR:
+      ['📋', 'Nhân sự'],
+
+    EVENT:
+      ['🎉', 'Hoạt động công ty'],
+
+    URGENT:
+      ['⚠️', 'Khẩn cấp']
+
+  };
+
+
+  return Object.keys(types)
+    .map(
+      key => `
+
+        <option
+          value="${key}"
+          ${
+            selected === key
+            ? 'selected'
+            : ''
+          }
+        >
+          ${types[key][0]}
+          ${types[key][1]}
+        </option>
+
+      `
+    )
+    .join('');
+}
+
+
+function getTypeIconClient(
+  type
+) {
+
+  const map = {
+
+    GENERAL: '📢',
+    WORK_TIME: '🕐',
+    SALARY: '💰',
+    BENEFIT: '🎁',
+    HEALTH: '🏥',
+    HSE: '🦺',
+    PRODUCTION: '🏭',
+    HR: '📋',
+    EVENT: '🎉',
+    URGENT: '⚠️'
+
+  };
+
+  return map[type] ||
+    '📢';
+}
+
+
+function formatDateDisplay(
+  value
+) {
+
+  if (!value) return '';
+
+  const d =
+    new Date(value);
+
+  if (isNaN(d)) {
+    return value;
+  }
+
+  return (
+    String(
+      d.getDate()
+    ).padStart(2, '0')
+    + '/'
+    +
+    String(
+      d.getMonth() + 1
+    ).padStart(2, '0')
+    + '/'
+    +
+    d.getFullYear()
+  );
+}
+
+
+function readFileBase64(
+  file
+) {
+
+  return new Promise(
+    (resolve, reject) => {
+
+      const reader =
+        new FileReader();
+
+      reader.onload =
+        () => {
+
+          const result =
+            String(
+              reader.result
+            );
+
+          const comma =
+            result.indexOf(',');
+
+          resolve(
+            comma >= 0
+              ? result.substring(
+                  comma + 1
+                )
+              : result
+          );
+        };
+
+      reader.onerror =
+        reject;
+
+      reader.readAsDataURL(
+        file
+      );
+    }
+  );
+}
+
+
+/* =====================================================
+ * SHEETJS
+ *
+ * Dùng để đọc XLS/XLSX ngay trên trình duyệt.
+ * ===================================================== */
+
+function loadSheetJS() {
+
+  return new Promise(
+    (resolve, reject) => {
+
+      if (
+        window.XLSX
+      ) {
+        resolve(
+          window.XLSX
+        );
+        return;
+      }
+
+
+      const script =
+        document.createElement(
+          'script'
+        );
+
+      script.src =
+        'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+
+      script.onload =
+        () =>
+          resolve(
+            window.XLSX
+          );
+
+      script.onerror =
+        () =>
+          reject(
+            new Error(
+              'Không tải được thư viện Excel.'
+            )
+          );
+
+      document.head.appendChild(
+        script
+      );
+    }
+  );
+}
+
+
+/* =====================================================
+ * EXCEL PARSER
+ * ===================================================== */
+
+async function parseExcelFile(
+  file
+) {
+
+  const XLSX =
+    await loadSheetJS();
+
+  const buffer =
+    await file.arrayBuffer();
+
+  const workbook =
+    XLSX.read(
+      buffer,
+      {
+        type: 'array',
+        cellDates: true
+      }
+    );
+
+  const sheetName =
+    workbook.SheetNames[0];
+
+  const sheet =
+    workbook.Sheets[
+      sheetName
+    ];
+
+  return XLSX.utils.sheet_to_json(
+    sheet,
+    {
+      defval: ''
+    }
+  );
+}
+
+
+/* =====================================================
+ * ADMIN IMPORT UI
+ * ===================================================== */
+
+App.showImportEmployees =
+  async function() {
+
+    const modal =
+      document.createElement(
+        'div'
+      );
+
+    modal.className =
+      'modal';
+
+    modal.id =
+      'importModal';
+
+    modal.innerHTML = `
+
+      <div class="modal-box">
+
+        <div class="modal-title">
+          📥 Import nhân viên từ Excel
+        </div>
+
+
+        <div class="form-group">
+
+          <label>
+            File Excel
+          </label>
+
+          <input
+            id="employeeExcel"
+            type="file"
+            class="input"
+            accept=".xlsx,.xls"
+          >
+
+        </div>
+
+
+        <div class="form-group">
+
+          <label>
+            Xử lý nhân viên không có trong Excel
+          </label>
+
+          <select
+            id="missingEmployeeMode"
+            class="select"
+          >
+
+            <option value="NO_CHANGE">
+              ○ Không thay đổi
+            </option>
+
+            <option value="INACTIVE">
+              ● Đánh dấu INACTIVE
+            </option>
+
+          </select>
+
+        </div>
+
+
+        <div
+          id="importPreview"
+          style="margin-top:15px"
+        ></div>
+
+
+        <div
+          style="
+            display:flex;
+            justify-content:flex-end;
+            gap:10px;
+            margin-top:20px;
+          "
+        >
+
+          <button
+            class="btn btn-secondary"
+            onclick="
+              document
+                .getElementById('importModal')
+                .remove()
+            "
+          >
+            Hủy
+          </button>
+
+          <button
+            id="confirmImportBtn"
+            class="btn btn-primary"
+            disabled
+          >
+            XÁC NHẬN IMPORT
+          </button>
+
+        </div>
+
+      </div>
+    `;
+
+
+    document.body.appendChild(
+      modal
+    );
+
+
+    let previewData =
+      null;
+
+
+    document
+      .getElementById(
+        'employeeExcel'
+      )
+      .addEventListener(
+        'change',
+        async function() {
+
+          const file =
+            this.files[0];
+
+          if (!file) return;
+
+
+          try {
+
+            App.loading(true);
+
+            const rows =
+              await parseExcelFile(
+                file
+              );
+
+            const preview =
+              await API.importPreview(
+                App.state.token,
+                rows,
+                file.name
+              );
+
+            previewData = {
+              rows:
+                preview.rows,
+
+              fileName:
+                file.name
+            };
+
+
+            document
+              .getElementById(
+                'importPreview'
+              )
+              .innerHTML = `
+
+                <div class="stats">
+
+                  <div class="stat-card">
+                    <div class="stat-label">
+                      Tổng
+                    </div>
+                    <div class="stat-value">
+                      ${preview.totalRows}
+                    </div>
+                  </div>
+
+                  <div class="stat-card">
+                    <div class="stat-label">
+                      Thêm mới
+                    </div>
+                    <div class="stat-value">
+                      ${preview.added}
+                    </div>
+                  </div>
+
+                  <div class="stat-card">
+                    <div class="stat-label">
+                      Cập nhật
+                    </div>
+                    <div class="stat-value">
+                      ${preview.updated}
+                    </div>
+                  </div>
+
+                  <div class="stat-card">
+                    <div class="stat-label">
+                      Bỏ qua
+                    </div>
+                    <div class="stat-value">
+                      ${preview.skipped}
+                    </div>
+                  </div>
+
+                </div>
+
+                <p class="text-muted">
+
+                  ⚠️ Không có nhân viên nào
+                  bị xóa tự động.
+
+                </p>
+              `;
+
+
+            document
+              .getElementById(
+                'confirmImportBtn'
+              )
+              .disabled = false;
+
+          } catch (e) {
+
+            alert(
+              e.message
+            );
+
+          } finally {
+
+            App.loading(false);
+
+          }
+
+        }
+      );
+
+
+    document
+      .getElementById(
+        'confirmImportBtn'
+      )
+      .onclick =
+      async () => {
+
+        if (!previewData) {
+          return;
+        }
+
+
+        if (
+          !confirm(
+            'Xác nhận ghi dữ liệu vào Google Sheets?'
+          )
+        ) {
+          return;
+        }
+
+
+        try {
+
+          App.loading(true);
+
+          const mode =
+            document
+              .getElementById(
+                'missingEmployeeMode'
+              )
+              .value;
+
+
+          const result =
+            await API.importConfirm(
+              App.state.token,
+              {
+                rows:
+                  previewData.rows,
+
+                fileName:
+                  previewData.fileName,
+
+                mode:
+                  mode
+              }
+            );
+
+
+          alert(
+            `Import thành công.
+
+Thêm mới: ${result.added}
+Cập nhật: ${result.updated}
+Bỏ qua: ${result.skipped}
+Đánh dấu INACTIVE: ${result.inactiveMarked}`
+          );
+
+
+          document
+            .getElementById(
+              'importModal'
+            )
+            .remove();
+
+        } catch (e) {
+
+          alert(
+            e.message
+          );
+
+        } finally {
+
+          App.loading(false);
+
+        }
+      };
+  };
+
+
+/* =====================================================
+ * ADMIN NAV EXTENSION
+ * ===================================================== */
+
+const originalRenderAdmin =
+  App.renderAdmin.bind(App);
+
+App.renderAdmin =
+  async function(main) {
+
+    await originalRenderAdmin(
+      main
+    );
+
+
+    const toolbar =
+      document.querySelector(
+        '.admin-toolbar'
+      );
+
+    if (!toolbar) return;
+
+
+    const importButton =
+      document.createElement(
+        'button'
+      );
+
+    importButton.className =
+      'btn btn-secondary';
+
+    importButton.textContent =
+      '📥 Import nhân viên';
+
+    importButton.onclick =
+      () =>
+        App.showImportEmployees();
+
+
+    toolbar.appendChild(
+      importButton
+    );
+  };
+
+
+</script>
