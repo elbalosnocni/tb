@@ -106,7 +106,7 @@ textarea{min-height:160px;resize:vertical}
    <h1>THÔNG BÁO NỘI BỘ</h1>
    <p class="muted">Đăng nhập để xem thông báo dành cho bạn.</p>
    <label for="employeeId">Mã Số Nhân Viên / Số Căn Cước</label>
-   <input id="employeeId" placeholder="Ví dụ: 5420" autocomplete="username">
+   <input id="employeeId" placeholder="Ví dụ: 066088011525" autocomplete="username">
    <label for="password">Mật khẩu</label>
    <input id="password" type="password" placeholder="••••••••" autocomplete="current-password">
    <button class="primary full" id="loginBtn">ĐĂNG NHẬP</button>
@@ -116,7 +116,7 @@ textarea{min-height:160px;resize:vertical}
 
  <section id="app" class="hidden">
   <header class="top">
-   <div class="brand">🏭 LIWAYWAY <span style="font-weight:500;color:#475569">| THÔNG BÁO</span></div>
+   <div class="brand">🏭 LIWAYWAY VIỆT NAM <span style="font-weight:500;color:#475569">| THÔNG BÁO</span></div>
    <div class="user">
     <span id="who"></span>
     <button class="btn" id="pwdBtn" title="Đổi mật khẩu">🔑</button>
@@ -147,355 +147,213 @@ textarea{min-height:160px;resize:vertical}
  </div>
 
 <script>
-/* CONFIGURATION */
+/* ==========================================================
+   1) CHỈ CẦN ĐỔI URL NÀY
+   ========================================================== */
 const API_URL = 'https://script.google.com/macros/s/AKfycbz9RJAgZlJB8wRlKDtaSTCVXmlUXZU1CZZT1CCduqGIIF3MZmGc5YKSx05Zy75co-VE/exec';
 
-const state = { token: '', user: null, dashboard: null, filters: {} };
-const TYPES = ['📢 Thông báo chung','🕐 Thời gian làm việc','💰 Lương & thưởng','🎁 Phúc lợi','🏥 Sức khỏe','🦺 An toàn / HSE','🏭 Sản xuất','📋 Nhân sự','🎉 Hoạt động công ty','⚠️ Khẩn cấp'];
+/* ========================================================== */
+const state={token:'',user:null,dashboard:null,filters:{}};
+const TYPES=['📢 Thông báo chung','🕐 Thời gian làm việc','💰 Lương & thưởng','🎁 Phúc lợi','🏥 Sức khỏe','🦺 An toàn / HSE','🏭 Sản xuất','📋 Nhân sự','🎉 Hoạt động công ty','⚠️ Khẩn cấp'];
 
-const $ = id => document.getElementById(id);
-function esc(x){ return String(x??'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])) }
-function attr(x){ return esc(x) }
-function toast(m){ alert(m) }
-function fmt(x){ if(!x) return ''; const d = new Date(x); return isNaN(d) ? String(x) : d.toLocaleString('vi-VN', {dateStyle:'short', timeStyle:'short'}) }
-function htmlContent(x){ return esc(x).replace(/\n/g,'<br>') }
+const $=id=>document.getElementById(id);
+function esc(x){return String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function attr(x){return esc(x)}
+function toast(m){alert(m)}
+function fmt(x){if(!x)return'';const d=new Date(x);return isNaN(d)?String(x):d.toLocaleString('vi-VN',{dateStyle:'short',timeStyle:'short'})}
+function htmlContent(x){return esc(x).replace(/\n/g,'<br>')}
+function setLoading(on,text='Đang xử lý...'){ $('loadingText').textContent=text; $('loading').classList.toggle('hidden',!on); document.body.style.overflow=on?'hidden':''; }
+async function withLoading(text,fn){setLoading(true,text);try{return await fn()}finally{setLoading(false)}}
 
-function setLoading(on, text = 'Đang xử lý...'){
-  $('loadingText').textContent = text;
-  $('loading').classList.toggle('hidden', !on);
-  document.body.style.overflow = on ? 'hidden' : '';
+async function api(action,data={}){
+ if(API_URL.includes('PASTE_YOUR')) throw new Error('Bạn chưa dán URL /exec của Google Apps Script vào API_URL.');
+ const res=await fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,...data})});
+ const text=await res.text();
+ let j;try{j=JSON.parse(text)}catch(e){throw new Error((text.includes('<!DOCTYPE')||text.includes('<html'))?'GAS đang trả về HTML thay vì JSON. Hãy Deploy > Manage deployments > Edit > New version và dùng đúng URL /exec.':'API trả về dữ liệu không hợp lệ.')}
+ if(!j.ok) throw new Error(j.error||'Có lỗi xảy ra.');
+ return j;
 }
 
-async function withLoading(text, fn){
-  setLoading(true, text);
-  try { return await fn(); } finally { setLoading(false); }
+async function boot(){
+ localStorage.removeItem('notice_token');sessionStorage.removeItem('notice_token');state.token='';showLogin();
 }
-
-async function api(action, data = {}){
-  if(!API_URL || API_URL.includes('PASTE_YOUR')) throw new Error('Vui lòng cấu hình API_URL Apps Script.');
-  const res = await fetch(API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({ action, ...data })
-  });
-  const text = await res.text();
-  let j;
-  try { j = JSON.parse(text); } catch(e) {
-    throw new Error(text.includes('<html') ? 'Google Apps Script trả về lỗi HTML. Kiểm tra lại bản Deploy.' : 'Lỗi phản hồi dữ liệu.');
-  }
-  if(!j.ok) throw new Error(j.error || 'Thao tác không thành công.');
-  return j;
-}
-
-function boot(){
-  localStorage.removeItem('notice_token');
-  sessionStorage.removeItem('notice_token');
-  state.token = '';
-  showLogin();
-}
-
-function showLogin(){ $('login').classList.remove('hidden'); $('app').classList.add('hidden'); }
-
+function showLogin(){$('login').classList.remove('hidden');$('app').classList.add('hidden')}
 function enter(){
-  $('login').classList.add('hidden');
-  $('app').classList.remove('hidden');
-  $('who').textContent = `Xin chào, ${state.user.fullName}`;
-  if(['ADMIN','HR'].includes(state.user.role)) $('adminNav').classList.remove('hidden');
-  load();
+ $('login').classList.add('hidden');$('app').classList.remove('hidden');
+ $('who').textContent=`Xin chào ${state.user.fullName}`;
+ if(['ADMIN','HR'].includes(state.user.role))$('adminNav').classList.remove('hidden');
+ load();
 }
-
 async function login(){
-  $('loginError').textContent = '';
-  const employeeId = $('employeeId').value.trim();
-  const password = $('password').value;
-  if(!employeeId || !password){ $('loginError').textContent = 'Vui lòng nhập đầy đủ thông tin.'; return; }
-  
-  await withLoading('Đang đăng nhập...', async () => {
-    try {
-      const r = await api('login', { employeeId, password, userAgent: navigator.userAgent });
-      state.token = r.token;
-      state.user = r.user;
-      $('employeeId').value = ''; $('password').value = '';
-      enter();
-    } catch(e) { $('loginError').textContent = e.message; }
-  });
+ $('loginError').textContent='';const employeeId=$('employeeId').value.trim(),password=$('password').value;if(!employeeId||!password){$('loginError').textContent='Vui lòng nhập đầy đủ thông tin.';return}
+ await withLoading('Đang đăng nhập...',async()=>{try{const r=await api('login',{employeeId,password,userAgent:navigator.userAgent});state.token=r.token;state.user=r.user;$('employeeId').value='';$('password').value='';enter()}catch(e){$('loginError').textContent=e.message}});
 }
-
 async function logout(){
-  try { await api('logout', { token: state.token }); } catch(e){}
-  state.token = ''; state.user = null;
-  showLogin();
+ try{await api('logout',{token:state.token})}catch(e){}
+ localStorage.removeItem('notice_token');sessionStorage.removeItem('notice_token');state.token='';state.user=null;$('employeeId').value='';$('password').value='';showLogin();
 }
 
 async function load(){
-  try {
-    state.dashboard = await api('dashboard', { token: state.token, filters: state.filters });
-    renderHome();
-    renderNotices();
-  } catch(e) {
-    if(e.message.includes('hết hạn')) logout();
-    else toast(e.message);
-  }
+ try{state.dashboard=await api('dashboard',{token:state.token,filters:state.filters});renderHome();renderNotices();}catch(e){if(e.message.includes('hết hạn'))logout();else toast(e.message)}
 }
-
 function nav(page){
-  ['home','notices','important','profile','admin'].forEach(x => $(x).classList.add('hidden'));
-  $(page).classList.remove('hidden');
-  document.querySelectorAll('.nav button').forEach(b => b.classList.toggle('active', b.dataset.page === page));
-  if(page === 'profile') renderProfile();
-  if(page === 'admin') renderAdmin();
+ ['home','notices','important','profile','admin'].forEach(x=>$(x).classList.add('hidden'));
+ $(page).classList.remove('hidden');
+ document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===page));
+ if(page==='profile')renderProfile();
+ if(page==='admin')renderAdmin();
 }
-
 function card(a){
-  return `<div class="card ${a.unread ? 'unread' : ''}" onclick="openNotice('${attr(a.id)}')">
-    <div class="head"><span class="badge">${esc(a.type)}</span><span>${a.pinned ? '📌' : ''}</span></div>
-    <div class="title">${esc(a.title)}</div>
-    <div class="meta">${fmt(a.publishDate)} · ${esc(a.author || '')}</div>
-    <div style="margin-top:8px">${htmlContent(String(a.content || '').replace(/<[^>]*>/g, ' ').slice(0, 200))}${String(a.content || '').length > 200 ? '…' : ''}</div>
-    <div style="margin-top:10px">${a.unread ? '<span class="badge red">🔴 Chưa đọc</span>' : '<span class="badge">✓ Đã đọc</span>'}</div>
-    <div class="detail-link">Xem chi tiết →</div>
-  </div>`;
+ return `<div class="card ${a.unread?'unread':''}" onclick="openNotice('${attr(a.id)}')">
+ <div class="head"><span class="badge">${esc(a.type)}</span><span>${a.pinned?'📌':''}</span></div>
+ <div class="title">${esc(a.title)}</div>
+ <div class="meta">${fmt(a.publishDate)} · ${esc(a.author||'')}</div>
+ <div style="margin-top:10px">${htmlContent(String(a.content||'').replace(/<[^>]*>/g,' ').slice(0,230))}${String(a.content||'').length>230?'…':''}</div>
+ <div style="margin-top:10px">${a.unread?'<span class="badge red">🔴 Chưa đọc</span>':'<span class="badge">✓ Đã đọc</span>'}</div><div class="detail-link">Bấm vào xem chi tiết →</div>
+ </div>`;
 }
-
 function renderHome(){
-  const d = state.dashboard;
-  $('home').innerHTML = `<div class="hero">
-    <div><h2>Xin chào ${esc(state.user.fullName)} 👋</h2><div class="muted">Thông báo mới nhất dành cho bộ phận ${esc(state.user.department || 'bạn')}.</div></div>
-    <div class="stat">Chưa đọc<b>${d.unreadCount}</b></div>
-  </div>
-  <div class="cards">${d.announcements.slice(0,6).map(card).join('') || '<div class="card">Không có thông báo mới.</div>'}</div>`;
+ const d=state.dashboard;
+ $('home').innerHTML=`<div class="hero"><div><h2>Xin chào ${esc(state.user.fullName)} 👋</h2><div class="muted">Thông báo mới nhất dành cho ${esc(state.user.department||'bạn')}.</div></div>
+ <div class="stat">🔴 Chưa đọc<b>${d.unreadCount}</b></div></div>
+ <div class="cards">${d.announcements.slice(0,6).map(card).join('')||'<div class="card">Không có thông báo.</div>'}</div>`;
 }
-
 function renderNotices(){
-  const d = state.dashboard, f = state.filters;
-  $('notices').innerHTML = `<div class="hero"><div><h2>📢 Tất cả thông báo</h2></div></div>
-  <div class="filters">
-    <input id="search" placeholder="🔎 Tìm kiếm..." value="${attr(f.search || '')}">
-    <select id="month"><option value="">📅 Tất cả tháng</option>${d.months.map(x=>`<option value="${attr(x.month)}" ${f.month===x.month?'selected':''}>Tháng ${x.month} (${x.count})</option>`).join('')}</select>
-    <select id="type"><option value="">🏷️ Loại tin</option>${TYPES.map(x=>`<option value="${attr(x)}" ${f.type===x?'selected':''}>${esc(x)}</option>`).join('')}</select>
-    <select id="department"><option value="">📍 Bộ phận</option>${d.departments.map(x=>`<option ${f.department===x?'selected':''}>${esc(x)}</option>`).join('')}</select>
-    <button class="primary" onclick="applyFilters()">Lọc</button>
-  </div>
-  <label style="margin-bottom:15px;display:inline-block"><input id="unread" type="checkbox" ${f.unreadOnly?'checked':''}> 🔴 Chỉ hiển thị chưa đọc</label>
-  <div class="cards">${d.announcements.map(card).join('') || '<div class="card">Không có thông báo phù hợp.</div>'}</div>`;
+ const d=state.dashboard,f=state.filters;
+ $('notices').innerHTML=`<div class="hero"><div><h2>📢 Thông báo</h2><div class="muted">Thông báo mới nhất luôn ở trên.</div></div></div>
+ <div class="filters">
+ <input id="search" placeholder="🔎 Tiêu đề, nội dung, phòng ban, từ khóa, mã..." value="${attr(f.search||'')}">
+ <select id="month"><option value="">📅 Tất cả tháng</option>${d.months.map(x=>`<option value="${attr(x.month)}" ${f.month===x.month?'selected':''}>Tháng ${x.month} (${x.count})</option>`).join('')}</select>
+ <select id="type"><option value="">🏷️ Tất cả loại</option>${TYPES.map(x=>`<option value="${attr(x)}" ${f.type===x?'selected':''}>${esc(x)}</option>`).join('')}</select>
+ <select id="department"><option value="">📍 Tất cả bộ phận</option>${d.departments.map(x=>`<option ${f.department===x?'selected':''}>${esc(x)}</option>`).join('')}</select>
+ <button class="primary" onclick="applyFilters()">Lọc</button></div>
+ <label style="margin:8px 0 15px"><input id="unread" type="checkbox" ${f.unreadOnly?'checked':''}> 🔴 Chưa đọc</label>
+ <div class="cards">${d.announcements.map(card).join('')||'<div class="card">Không tìm thấy thông báo phù hợp.</div>'}</div>`;
 }
-
 function applyFilters(){
-  state.filters = { search: $('search').value, month: $('month').value, type: $('type').value, department: $('department').value, unreadOnly: $('unread').checked };
-  load();
+ state.filters={search:$('search').value,month:$('month').value,type:$('type').value,department:$('department').value,unreadOnly:$('unread').checked};load();
 }
-
-async function important(){
-  try {
-    await withLoading('Tải dữ liệu...', async () => {
-      const r = await api('important', { token: state.token });
-      $('important').innerHTML = `<div class="hero"><div><h2>📌 Thông báo quan trọng</h2></div></div>
-      <div class="cards">${(r.announcements || []).map(card).join('') || '<div class="card">Không có thông báo quan trọng.</div>'}</div>`;
-      nav('important');
-    });
-  } catch(e) { toast(e.message); }
-}
-
+async function important(){try{await withLoading('Đang tải thông báo quan trọng...',async()=>{const r=await api('important',{token:state.token});$('important').innerHTML='<div class="hero"><div><h2>📌 Quan trọng</h2><div class="muted">Thông báo ghim, ưu tiên cao/khẩn cấp.</div></div></div><div class="cards">'+(r.announcements||[]).map(card).join('')||'<div class="card">Chưa có thông báo quan trọng.</div>'+'</div>';nav('important')})}catch(e){toast(e.message)}};nav('notices');load()}
 async function openNotice(id){
-  try {
-    const r = await api('announcement', { token: state.token, id });
-    const a = r.announcement, att = r.attachment;
-    $('modal').classList.remove('hidden');
-    $('modal').innerHTML = `<div class="modalbox">
-      <div class="modalhead"><h2>${esc(a.title)}</h2><button class="close" onclick="closeModal()">×</button></div>
-      <div class="meta">${fmt(a.publishDate)} · ${esc(a.type)} · ${esc(a.author || '')}</div><hr style="border:0;border-top:1px solid #edf0f4;margin:12px 0">
-      <div class="content">${htmlContent(a.content)}</div>
-      ${att ? attachment(att) : ''}
-    </div>`;
-    await load();
-  } catch(e) { toast(e.message); }
+ try{
+  const r=await api('announcement',{token:state.token,id}),a=r.announcement,att=r.attachment;
+  $('modal').classList.remove('hidden');
+  $('modal').innerHTML=`<div class="modalbox"><div class="modalhead"><h2>${esc(a.title)}</h2><button class="close" onclick="closeModal()">×</button></div>
+  <div class="meta">${fmt(a.publishDate)} · ${esc(a.type)} · ${esc(a.author||'')}</div><hr><div class="content">${htmlContent(a.content)}</div>
+  ${att?attachment(att):''}<div style="margin-top:18px"><span class="badge">✓ Đã đọc</span></div></div>`;
+  await load();
+ }catch(e){toast(e.message)}
 }
-
 function attachment(a){
-  const url = a.previewUrl || a.url || '';
-  if(!url) return '';
-  return `<div class="attachment"><b>📎 Tệp đính kèm: ${esc(a.name || 'File')}</b><p><a href="${attr(url)}" target="_blank" rel="noopener">Tải xuống / Mở trong cửa sổ mới</a></p><iframe src="${attr(url)}"></iframe></div>`;
+ const url=a.previewUrl||a.url||'';if(!url)return'';
+ return `<div class="attachment"><b>📎 ${esc(a.name||'Tệp đính kèm')}</b><p><a href="${attr(url)}" target="_blank" rel="noopener">Mở tệp</a></p><iframe src="${attr(url)}"></iframe></div>`;
 }
-
-function closeModal(){ $('modal').classList.add('hidden'); $('modal').innerHTML = ''; }
-
+function closeModal(){$('modal').classList.add('hidden');$('modal').innerHTML=''}
 function renderProfile(){
-  $('profile').innerHTML = `<div class="card">
-    <h2>👤 Thông tin tài khoản</h2>
-    <p><b>Mã nhân viên:</b> ${esc(state.user.employeeId)}</p>
-    <p><b>Họ và tên:</b> ${esc(state.user.fullName)}</p>
-    <p><b>Bộ phận:</b> ${esc(state.user.department || 'N/A')}</p>
-    <button class="primary" onclick="passwordModal()">🔑 Đổi mật khẩu</button>
-  </div>`;
+ $('profile').innerHTML=`<div class="card"><h2>👤 Cá nhân</h2><p><b>Mã nhân viên:</b> ${esc(state.user.employeeId)}</p><p><b>Họ tên:</b> ${esc(state.user.fullName)}</p><p><b>Bộ phận:</b> ${esc(state.user.department||'')}</p><button class="primary" onclick="passwordModal()">🔑 Đổi mật khẩu</button></div>`;
 }
-
 function passwordModal(){
-  $('modal').classList.remove('hidden');
-  $('modal').innerHTML = `<div class="modalbox" style="max-width:400px">
-    <div class="modalhead"><h2>Đổi mật khẩu</h2><button class="close" onclick="closeModal()">×</button></div>
-    <label>Mật khẩu hiện tại</label><input id="oldpw" type="password">
-    <label>Mật khẩu mới</label><input id="newpw" type="password">
-    <label>Xác nhận mật khẩu mới</label><input id="newpw2" type="password">
-    <button class="primary full" onclick="changePw()">Lưu thay đổi</button>
-  </div>`;
+ $('modal').classList.remove('hidden');$('modal').innerHTML=`<div class="modalbox"><div class="modalhead"><h2>🔑 Đổi mật khẩu</h2><button class="close" onclick="closeModal()">×</button></div>
+ <label>Mật khẩu cũ</label><input id="oldpw" type="password"><label>Mật khẩu mới</label><input id="newpw" type="password"><label>Nhập lại</label><input id="newpw2" type="password"><button class="primary full" onclick="changePw()">Lưu</button></div>`;
 }
-
 async function changePw(){
-  if($('newpw').value !== $('newpw2').value){ toast('Mật khẩu nhập lại không khớp'); return; }
-  try {
-    await api('changePassword', { token: state.token, oldPassword: $('oldpw').value, newPassword: $('newpw').value });
-    toast('Cập nhật mật khẩu thành công!');
-    closeModal();
-  } catch(e) { toast(e.message); }
+ if($('newpw').value!==$('newpw2').value){toast('Mật khẩu nhập lại không khớp');return}
+ try{await api('changePassword',{token:state.token,oldPassword:$('oldpw').value,newPassword:$('newpw').value});toast('Đã đổi mật khẩu');closeModal()}catch(e){toast(e.message)}
 }
 
-/* ADMIN PANEL FUNCTIONALITIES */
+/* ---------- ADMIN UI ---------- */
 async function renderAdmin(){
-  if(!['ADMIN','HR'].includes(state.user.role)) return;
-  try {
-    const r = await api('adminDashboard', { token: state.token });
-    $('admin').innerHTML = `<div class="hero">
-      <h2>⚙️ QUẢN LÝ THÔNG BÁO</h2>
-      <div class="actions">
-        <button class="btn" onclick="importModal()">📥 Import Excel</button>
-        <button class="primary" onclick="announcementModal()">＋ Tạo bài viết</button>
-      </div>
-    </div>
-    <div class="stats">
-      <div class="stat">Nhân viên<b>${r.stats.employees}</b></div>
-      <div class="stat">Bài viết<b>${r.stats.announcements}</b></div>
-      <div class="stat">Đã đăng<b>${r.stats.published}</b></div>
-      <div class="stat">Lượt đọc<b>${r.stats.totalReads}</b></div>
-    </div>
-    <div style="height:15px"></div>
-    <div class="tablebox">
-      <table class="table">
-        <thead><tr><th>Ngày</th><th>Tiêu đề</th><th>Loại</th><th>Tác giả</th><th>Thao tác</th></tr></thead>
-        <tbody>
-          ${r.announcements.map(a => `<tr>
-            <td>${fmt(a.publishDate)}</td>
-            <td>${a.pinned ? '📌 ' : ''}${esc(a.title)}</td>
-            <td>${esc(a.type)}</td>
-            <td>${esc(a.author)}</td>
-            <td><div class="actions">
-              <button class="btn" onclick="openNotice('${attr(a.id)}')">👁️</button>
-              <button class="btn" onclick="editAnnouncement('${attr(a.id)}')">✏️</button>
-              <button class="btn" onclick="pin('${attr(a.id)}')">📌</button>
-              <button class="btn" onclick="delAnn('${attr(a.id)}')">🗑️</button>
-            </div></td>
-          </tr>`).join('')}
-        </tbody>
-      </table>
-    </div>`;
-  } catch(e) { toast(e.message); }
+ if(!['ADMIN','HR'].includes(state.user.role))return;
+ try{
+  const r=await api('adminDashboard',{token:state.token});
+  $('admin').innerHTML=`<div class="hero"><h2>⚙️ QUẢN LÝ THÔNG BÁO</h2><div class="actions"><button class="btn" onclick="importModal()">📥 Import nhân viên</button><button class="primary" onclick="announcementModal()">＋ Tạo thông báo mới</button></div></div>
+  <div class="stats"><div class="stat">Nhân viên<b>${r.stats.employees}</b></div><div class="stat">Thông báo<b>${r.stats.announcements}</b></div><div class="stat">Published<b>${r.stats.published}</b></div><div class="stat">Hẹn giờ<b>${r.stats.scheduled}</b></div><div class="stat">Lượt đọc<b>${r.stats.totalReads}</b></div></div>
+  <div style="height:18px"></div><div class="tablebox"><table class="table"><thead><tr><th>Ngày</th><th>Tiêu đề</th><th>Loại</th><th>Người đăng</th><th>Trạng thái</th><th>Đối tượng</th><th>Thao tác</th></tr></thead><tbody>
+  ${r.announcements.map(a=>`<tr><td>${fmt(a.publishDate)}</td><td>${a.pinned?'📌 ':''}${esc(a.title)}</td><td>${esc(a.type)}</td><td>${esc(a.author)}</td><td>${esc(a.status)}</td><td>${esc(a.targetText)}</td><td><div class="actions"><button class="btn" onclick="openNotice('${attr(a.id)}')">👁️</button><button class="btn" onclick="editAnnouncement('${attr(a.id)}')">✏️</button><button class="btn" onclick="pin('${attr(a.id)}')">📌</button><button class="btn" onclick="stats('${attr(a.id)}')">📊</button><button class="btn" onclick="delAnn('${attr(a.id)}')">🗑️</button></div></td></tr>`).join('')}
+  </tbody></table></div>`;
+ }catch(e){toast(e.message)}
 }
-
-function announcementModal(existing = null){
-  const a = existing || {};
-  $('modal').classList.remove('hidden');
-  $('modal').innerHTML = `<div class="modalbox">
-    <div class="modalhead"><h2>${a.id ? '✏️ Chỉnh sửa' : '＋ Tạo mới'} thông báo</h2><button class="close" onclick="closeModal()">×</button></div>
-    <input id="aid" type="hidden" value="${attr(a.id || '')}">
-    <label>Tiêu đề</label><input id="atitle" value="${attr(a.title || '')}">
-    <label>Nội dung</label><textarea id="acontent">${esc(a.content || '')}</textarea>
-    <div class="grid2">
-      <div><label>Phân loại</label><select id="atype">${TYPES.map(x=>`<option ${a.type===x?'selected':''}>${esc(x)}</option>`).join('')}</select></div>
-      <div><label>Độ ưu tiên</label><select id="apriority"><option>NORMAL</option><option ${a.priority==='HIGH'?'selected':''}>HIGH</option><option ${a.priority==='URGENT'?'selected':''}>URGENT</option></select></div>
-    </div>
-    <div style="margin:12px 0"><label><input id="apinned" type="checkbox" ${a.pinned?'checked':''}> 📌 Ghim lên đầu trang</label></div>
-    <button class="primary full" onclick="saveAnnouncement()">LƯU BÀI VIẾT</button>
-  </div>`;
+function announcementModal(existing=null){
+ const a=existing||{};
+ $('modal').classList.remove('hidden');
+ $('modal').innerHTML=`<div class="modalbox"><div class="modalhead"><h2>${a.id?'✏️ Sửa':'＋ Tạo'} thông báo</h2><button class="close" onclick="closeModal()">×</button></div>
+ <input id="aid" type="hidden" value="${attr(a.id||'')}"><label>Tiêu đề</label><input id="atitle" value="${attr(a.title||'')}">
+ <label>Nội dung</label><textarea id="acontent">${esc(a.content||'')}</textarea>
+ <div class="grid2"><div><label>Loại</label><select id="atype">${TYPES.map(x=>`<option ${a.type===x?'selected':''}>${esc(x)}</option>`).join('')}</select></div>
+ <div><label>Ưu tiên</label><select id="apriority"><option>NORMAL</option><option ${a.priority==='HIGH'?'selected':''}>HIGH</option><option ${a.priority==='URGENT'?'selected':''}>URGENT</option></select></div></div>
+ <div class="grid2"><div><label>Ngày đăng</label><input id="adate" type="datetime-local" value="${localInput(a.publishDate)}"></div><div><label>⏰ Hẹn giờ đăng</label><input id="aschedule" type="datetime-local"></div></div>
+ <label>Từ khóa</label><input id="akeywords" value="${attr(a.keywords||'')}"><label><input id="apinned" type="checkbox" ${a.pinned?'checked':''}> 📌 Ghim</label>
+ <label>Đối tượng xem</label><div id="targets"><div class="target"><select><option value="ALL">ALL</option><option value="DEPARTMENT">DEPARTMENT</option><option value="EMPLOYEE">EMPLOYEE</option><option value="TYPE">TYPE</option></select><input placeholder="ALL / bộ phận / mã NV / chức danh"></div></div>
+ <button class="btn" onclick="addTarget()">＋ Thêm điều kiện</button><div class="drop"><input id="afile" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg,.gif,.webp,.mp4"></div>
+ <button class="primary full" onclick="saveAnnouncement()">LƯU THÔNG BÁO</button></div>`;
 }
-
+function addTarget(){const d=document.createElement('div');d.className='target';d.innerHTML=`<select><option value="ALL">ALL</option><option value="DEPARTMENT">DEPARTMENT</option><option value="EMPLOYEE">EMPLOYEE</option><option value="TYPE">TYPE</option></select><input placeholder="Giá trị"><button class="btn" onclick="this.parentNode.remove()">×</button>`;$('targets').appendChild(d)}
+function localInput(x){if(!x)return'';const d=new Date(x);if(isNaN(d))return'';const p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`}
 async function saveAnnouncement(){
-  await withLoading('Đang lưu bài viết...', async () => {
-    try {
-      await api('saveAnnouncement', { token: state.token, data: {
-        id: $('aid').value, title: $('atitle').value, content: $('acontent').value,
-        type: $('atype').value, priority: $('apriority').value, pinned: $('apinned').checked
-      }});
-      closeModal(); renderAdmin(); toast('Đã lưu thành công');
-    } catch(e) { toast(e.message); }
-  });
+ await withLoading('Đang lưu thông báo...',async()=>{
+ try{
+  let attachmentJson=null;const file=$('afile').files[0];if(file)attachmentJson=(await upload(file));
+  const targets=[...document.querySelectorAll('#targets .target')].map(x=>({type:x.children[0].value,value:x.children[1].value||'ALL'}));
+  await api('saveAnnouncement',{token:state.token,data:{id:$('aid').value,title:$('atitle').value,content:$('acontent').value,type:$('atype').value,priority:$('apriority').value,pinned:$('apinned').checked,publishDate:$('adate').value,scheduledAt:$('aschedule').value,keywords:$('akeywords').value,targets,attachmentJson}});
+  closeModal();renderAdmin();toast('Đã lưu thông báo');
+ }catch(e){toast(e.message)}
+ });
 }
-
+async function upload(file){
+ if(file.size>25*1024*1024)throw new Error('File tối đa 25MB.');
+ const b64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(file)});
+ const x=await api('uploadAttachment',{token:state.token,file:{name:file.name,mimeType:file.type,base64:b64}});
+ return x.attachment;
+}
 async function editAnnouncement(id){
-  try {
-    const r = await api('adminDashboard', { token: state.token });
-    const a = r.announcements.find(x => x.id === id);
-    if(a) announcementModal(a);
-  } catch(e) { toast(e.message); }
+ try{
+  const r=await api('adminDashboard',{token:state.token});const a=r.announcements.find(x=>x.id===id);if(a)announcementModal(a);
+ }catch(e){toast(e.message)}
 }
+async function pin(id){try{await api('togglePinned',{token:state.token,id});renderAdmin()}catch(e){toast(e.message)}}
+async function delAnn(id){if(!confirm('Xóa thông báo này?'))return;try{await api('deleteAnnouncement',{token:state.token,id});renderAdmin()}catch(e){toast(e.message)}}
+async function stats(id){try{const r=await api('readStats',{token:state.token,id});alert(`THÔNG BÁO: ${r.title}\nĐối tượng: ${r.audience.toLocaleString()}\n✓ Đã đọc: ${r.read.toLocaleString()}\n○ Chưa đọc: ${r.unread.toLocaleString()}\nTỷ lệ đọc: ${r.rate.toFixed(2)}%`)}catch(e){toast(e.message)}}
 
-async function pin(id){ try{ await api('togglePinned', { token: state.token, id }); renderAdmin(); }catch(e){ toast(e.message); } }
-async function delAnn(id){ if(confirm('Bạn chắc chắn muốn xóa?')){ try{ await api('deleteAnnouncement', { token: state.token, id }); renderAdmin(); }catch(e){ toast(e.message); } } }
-
-/* EXCEL IMPORT FUNCTIONALITY */
-let importRows = [];
+/* ---------- EXCEL ---------- */
+let importRows=[],importName='';
 async function loadXLSX(){
-  if(window.XLSX) return;
-  await new Promise((resolve, reject) => {
-    const s = document.createElement('script');
-    s.src = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';
-    s.onload = resolve; s.onerror = reject;
-    document.head.appendChild(s);
-  });
+ if(window.XLSX)return;
+ await new Promise((ok,no)=>{const s=document.createElement('script');s.src='https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';s.onload=ok;s.onerror=no;document.head.appendChild(s)});
 }
-
 function importModal(){
-  $('modal').classList.remove('hidden');
-  $('modal').innerHTML = `<div class="modalbox">
-    <div class="modalhead"><h2>📥 Import danh sách Nhân viên</h2><button class="close" onclick="closeModal()">×</button></div>
-    <div class="drop"><input id="excel" type="file" accept=".xlsx, .xls, .csv"></div>
-    <div id="preview" style="margin-top:15px"></div>
-    <button class="primary full" onclick="previewImport()">Xem trước</button>
-    <button id="commit" class="primary full hidden" style="background:#16a34a" onclick="commitImport()">Xác nhận Import</button>
-  </div>`;
+ $('modal').classList.remove('hidden');$('modal').innerHTML=`<div class="modalbox"><div class="modalhead"><h2>📥 Import nhân viên từ Excel</h2><button class="close" onclick="closeModal()">×</button></div>
+ <p>EmployeeID là khóa chính. Không xóa nhân viên cũ.</p><div class="drop"><input id="excel" type="file" accept=".xlsx,.xls,.csv"></div>
+ <label><input type="radio" name="missing" value="NO_CHANGE" checked> Không thay đổi người không có trong Excel</label>
+ <label><input type="radio" name="missing" value="INACTIVE"> Đánh dấu INACTIVE</label>
+ <div id="preview" style="margin-top:15px"></div><button class="primary full" onclick="previewImport()">1. Xem trước</button><button id="commit" class="primary full hidden" onclick="commitImport()">2. Xác nhận Import</button></div>`;
 }
-
 async function previewImport(){
-  await withLoading('Đang đọc tập tin Excel...', async () => {
-    try {
-      await loadXLSX();
-      const f = $('excel').files[0];
-      if(!f) throw new Error('Vui lòng chọn file Excel.');
-      const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      importRows = XLSX.utils.sheet_to_json(ws, { defval: '' });
-      
-      const r = await api('previewImport', { token: state.token, rows: importRows });
-      $('preview').innerHTML = `<div class="stat">Tìm thấy <b>${r.total}</b> dòng hợp lệ.</div>`;
-      $('commit').classList.remove('hidden');
-    } catch(e) { toast(e.message); }
-  });
+ await withLoading('Đang đọc và kiểm tra Excel...',async()=>{
+ try{
+  await loadXLSX();const f=$('excel').files[0];if(!f)throw new Error('Chọn file Excel.');
+  importName=f.name;const wb=XLSX.read(await f.arrayBuffer(),{type:'array'}),ws=wb.Sheets[wb.SheetNames[0]];
+  importRows=XLSX.utils.sheet_to_json(ws,{defval:''});const r=await api('previewImport',{token:state.token,rows:importRows});
+  $('preview').innerHTML=`<div class="stat">Tổng: <b>${r.total}</b> Thêm: ${r.added} · Cập nhật: ${r.updated} · Trùng: ${r.duplicates.length}</div>
+  <div class="tablebox" style="margin-top:10px"><table class="table"><thead><tr><th>EmployeeID</th><th>Họ tên</th><th>Bộ phận</th><th>Action</th></tr></thead><tbody>${r.rows.map(x=>`<tr><td>${esc(x.EmployeeID)}</td><td>${esc(x.FullName)}</td><td>${esc(x.Department)}</td><td>${esc(x.action)}</td></tr>`).join('')}</tbody></table></div>`;
+  $('commit').classList.remove('hidden');
+ }catch(e){toast(e.message)}
+ });
 }
-
 async function commitImport(){
-  if(!confirm('Cập nhật thông tin vào hệ thống?')) return;
-  await withLoading('Đang đồng bộ dữ liệu...', async () => {
-    try {
-      const r = await api('commitImport', { token: state.token, rows: importRows, missingAction: 'NO_CHANGE' });
-      toast(`Hoàn tất! Thêm mới: ${r.added}, Cập nhật: ${r.updated}`);
-      closeModal();
-    } catch(e) { toast(e.message); }
-  });
+ if(!importRows.length)return;if(!confirm('Xác nhận ghi dữ liệu vào Google Sheets?'))return;
+ await withLoading('Đang import nhân viên vào Google Sheets...',async()=>{
+ try{
+  const missing=document.querySelector('input[name="missing"]:checked').value;
+  const r=await api('commitImport',{token:state.token,rows:importRows,fileName:importName,missingAction:missing});
+  alert(`Import thành công\nThêm: ${r.added}\nCập nhật: ${r.updated}\nBỏ qua: ${r.skipped}\nINACTIVE: ${r.markedInactive}\nImport ID: ${r.importId}`);closeModal();
+ }catch(e){toast(e.message)}
+ });
 }
 
-/* EVENT BINDINGS */
-$('loginBtn').onclick = login;
-$('password').addEventListener('keydown', e => { if(e.key === 'Enter') login(); });
-$('logoutBtn').onclick = logout;
-$('pwdBtn').onclick = passwordModal;
-
-document.querySelectorAll('.nav button').forEach(b => {
-  b.onclick = () => {
-    const page = b.dataset.page;
-    if(page === 'important') important();
-    else nav(page);
-  };
-});
-
-// Khởi chạy ứng dụng
+/* ---------- EVENTS ---------- */
+$('loginBtn').onclick=login;$('password').addEventListener('keydown',e=>{if(e.key==='Enter')login()});
+$('logoutBtn').onclick=logout;$('pwdBtn').onclick=passwordModal;
+document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>b.dataset.page==='important'?important():nav(b.dataset.page));
 boot();
 </script>
 </body>
