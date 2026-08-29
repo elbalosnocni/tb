@@ -16,34 +16,7 @@ body{margin:0;font-family:Inter,system-ui,-apple-system,sans-serif;background:#f
 .ext-link.active{background:linear-gradient(135deg,#2563eb,#1e40af);color:#fff;border:none}
 
 /* Auth Section */
-.login{
-    min-height:calc(100dvh - 64px);
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    padding:32px 20px;
-    background:linear-gradient(135deg,#edf2ff,#f8fafc);
-}
-
-.login-card{
-    width:min(430px,100%);
-    background:#fff;
-    padding:34px;
-    border-radius:22px;
-    box-shadow:0 20px 60px rgba(23,32,51,.10);
-    margin:auto;
-}
-
-@media(max-width:768px){
-    .login{
-        min-height:calc(100dvh - 120px);
-        padding:24px 16px;
-    }
-
-    .login-card{
-        padding:26px 22px;
-    }
-}
+.login{min-height:calc(100vh - 60px);display:grid;place-items:center;padding:20px;background:linear-gradient(135deg,#edf2ff,#f8fafc)}
 .login-card{width:min(430px,100%);background:#fff;padding:34px;border-radius:22px;box-shadow:0 20px 60px rgba(23,32,51,.1)}
 .brand{font-weight:800;color:#2457d6;letter-spacing:.5px}
 .login h1{font-size:22px;margin:12px 0 5px}
@@ -133,7 +106,13 @@ textarea{min-height:160px;resize:vertical}
    <h1>THÔNG BÁO NỘI BỘ</h1>
    <p class="muted">Chỉ lưu hành nội bộ, không được chia sẻ.</p>
    <p style="margin:5px 0;">📱 Quét QR để tra cứu nhanh</p>
-        <img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=https://thongbao.pages.dev/" alt="QR Code">   
+   <div style="text-align:center;margin:10px 0 18px;">
+    <img
+        src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=https://thongbao.pages.dev/"
+        alt="QR Code"
+        style="display:inline-block;width:120px;height:120px;"
+    >
+    </div>   
    <label for="employeeId">Số Căn Cước</label>
    <input id="employeeId" placeholder="Ví dụ: 012345678999" autocomplete="username" inputmode="numeric">
    <button class="primary full" id="loginBtn">ĐĂNG NHẬP</button>
