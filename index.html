@@ -104,9 +104,13 @@ textarea{min-height:160px;resize:vertical}
   <div class="login-card">
    <div class="brand">🏭 CÔNG TY CP LIWAYWAY VIỆT NAM</div>
    <h1>THÔNG BÁO NỘI BỘ</h1>
-   <p class="muted">Chỉ cần nhập EmployeeID / số căn cước. Không sử dụng mật khẩu.</p>
-   <label for="employeeId">Mã Số Nhân Viên / Số Căn Cước</label>
-   <input id="employeeId" placeholder="Ví dụ: 066088011525" autocomplete="username" inputmode="numeric">
+   <p class="muted">Chỉ có giá trị lưu hành nội bộ công ty.</p>
+    <div style="margin-top:10px">
+        <p style="margin:5px 0;">📱 Quét QR để tra cứu nhanh</p>
+        <img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=https://thongbao.pages.dev/" alt="QR Code">
+    </div>   
+   <label for="employeeId">Số Căn Cước</label>
+   <input id="employeeId" placeholder="Ví dụ: 012345678999" autocomplete="username" inputmode="numeric">
    <button class="primary full" id="loginBtn">ĐĂNG NHẬP</button>
    <div id="loginError" class="error"></div>
   </div>
