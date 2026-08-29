@@ -642,29 +642,108 @@ function getEmployees(token, query) {
 }
 
 function uploadAttachment(token, file) {
-  const session=requireSession_(token);requireAdmin_(session);
-  file=file||{};
-  const name=String(file.name||'').trim();
-  const mime=String(file.mimeType||'application/octet-stream');
-  const b64=String(file.base64||'');
-  if(!name || !b64) throw new Error('Tệp không hợp lệ.');
-  const bytes=Utilities.base64Decode(b64);
-  if(bytes.length>CONFIG.maxAttachmentBytes) throw new Error('File tối đa 25MB.');
+  const session = requireSession_(token);
+  requireAdmin_(session);
 
-  const folderId=PropertiesService.getScriptProperties().getProperty('ATTACHMENT_FOLDER_ID');
-  let folder;
-  if(folderId){
-    folder=DriveApp.getFolderById(folderId);
-  }else{
-    folder=DriveApp.createFolder('Internal Notice Attachments');
-    PropertiesService.getScriptProperties().setProperty('ATTACHMENT_FOLDER_ID',folder.getId());
+  file = file || {};
+
+  const name = String(file.name || '').trim();
+  const mime = String(file.mimeType || 'application/octet-stream');
+  const b64 = String(file.base64 || '');
+
+  if (!name || !b64) {
+    throw new Error('Tệp không hợp lệ.');
   }
-  const blob=Utilities.newBlob(bytes,mime,name);
-  const created=folder.createFile(blob);
-  const id=created.getId();
-  const url='https://drive.google.com/file/d/'+id+'/view';
-  audit_(session.employeeId,'UPLOAD_ATTACHMENT','File',id,name);
-  return {ok:true,attachment:{id,name,mimeType:mime,size:bytes.length,url:url,previewUrl:url}};
+
+  const bytes = Utilities.base64Decode(b64);
+
+  if (bytes.length > CONFIG.maxAttachmentBytes) {
+    throw new Error('File tối đa 25MB.');
+  }
+
+  // Lấy thư mục chứa file đính kèm
+  const folderId =
+    PropertiesService
+      .getScriptProperties()
+      .getProperty('ATTACHMENT_FOLDER_ID');
+
+  let folder;
+
+  if (folderId) {
+    folder = DriveApp.getFolderById(folderId);
+  } else {
+    folder = DriveApp.createFolder('Internal Notice Attachments');
+
+    PropertiesService
+      .getScriptProperties()
+      .setProperty(
+        'ATTACHMENT_FOLDER_ID',
+        folder.getId()
+      );
+  }
+
+  // Tạo file
+  const blob = Utilities.newBlob(
+    bytes,
+    mime,
+    name
+  );
+
+  const created = folder.createFile(blob);
+
+  const id = created.getId();
+
+  // =====================================================
+  // CẤP QUYỀN XEM CHO FILE MỚI
+  // =====================================================
+  try {
+    created.setSharing(
+      DriveApp.Access.ANYONE_WITH_LINK,
+      DriveApp.Permission.VIEW
+    );
+  } catch (err) {
+    console.log(
+      'Không thể cấp quyền xem file: ' +
+      err.message
+    );
+  }
+
+  // Link mở file
+  const url =
+    'https://drive.google.com/file/d/' +
+    id +
+    '/view';
+
+  // Link dùng cho iframe preview
+  const previewUrl =
+    'https://drive.google.com/file/d/' +
+    id +
+    '/preview';
+
+  audit_(
+    session.employeeId,
+    'UPLOAD_ATTACHMENT',
+    'File',
+    id,
+    name
+  );
+
+  return {
+    ok: true,
+
+    attachment: {
+      id: id,
+      name: name,
+      mimeType: mime,
+      size: bytes.length,
+
+      // Mở ngoài
+      url: url,
+
+      // Preview trong hệ thống
+      previewUrl: previewUrl
+    }
+  };
 }
 
 /* ---------------- HELPERS ---------------- */
